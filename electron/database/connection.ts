@@ -14,9 +14,20 @@ export async function initDatabase(): Promise<void> {
     }
 
     const initSqlJs = (await import('sql.js')).default
-    const wasmPath = app.isPackaged
+    let wasmPath = app.isPackaged
         ? path.join(process.resourcesPath, 'sql-wasm.wasm')
         : path.join(app.getAppPath(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm')
+
+    console.log('Initializing DB with wasm path:', wasmPath)
+
+    if (!app.isPackaged && !fs.existsSync(wasmPath)) {
+        console.warn('Wasm file not found at calculated path, trying fallback...')
+        const fallbackPath = path.join(__dirname, '../../node_modules/sql.js/dist/sql-wasm.wasm')
+        if (fs.existsSync(fallbackPath)) {
+            console.log('Found wasm at fallback path:', fallbackPath)
+            wasmPath = fallbackPath
+        }
+    }
 
     const SQL = await initSqlJs({ locateFile: () => wasmPath })
     db = fs.existsSync(dbPath) ? new SQL.Database(fs.readFileSync(dbPath)) : new SQL.Database()
@@ -160,6 +171,10 @@ function buildSql(sql: string, params: any[]): string {
 
 export function setupDatabaseIPC() {
     ipcMain.handle('db:query', (_, sql: string, params: any[]) => {
+        if (!db) {
+            console.error('DB not initialized')
+            return []
+        }
         try {
             const finalSql = params?.length ? buildSql(sql, params) : sql
             const result = db.exec(finalSql)
@@ -177,6 +192,10 @@ export function setupDatabaseIPC() {
     })
 
     ipcMain.handle('db:run', (_, sql: string, params: any[]) => {
+        if (!db) {
+            console.error('DB not initialized')
+            return { lastId: 0, changes: 0 }
+        }
         try {
             const finalSql = params?.length ? buildSql(sql, params) : sql
             console.log('RUN:', finalSql.slice(0, 60))
@@ -198,6 +217,10 @@ export function setupDatabaseIPC() {
     })
 
     ipcMain.handle('db:get', (_, sql: string, params: any[]) => {
+        if (!db) {
+            console.error('DB not initialized')
+            return null
+        }
         try {
             const finalSql = params?.length ? buildSql(sql, params) : sql
             const result = db.exec(finalSql)

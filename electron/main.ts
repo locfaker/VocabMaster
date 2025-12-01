@@ -67,10 +67,10 @@ ipcMain.handle('theme:set', (_, theme: 'dark' | 'light' | 'system') => {
 app.whenReady().then(async () => {
     try {
         await initDatabase()
-        setupDatabaseIPC()
     } catch (e) {
         console.error('Database init failed:', e)
     }
+    setupDatabaseIPC()
     createWindow()
     createTray()
 })
