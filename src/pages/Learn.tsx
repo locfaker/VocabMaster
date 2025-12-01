@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, RotateCcw, Volume2, Keyboard, Flame } from 'lucide-react'
+import { ArrowLeft, RotateCcw, Volume2, Keyboard, Flame, Lightbulb } from 'lucide-react'
 import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
 import { useLearningStore } from '@/store/learningStore'
@@ -18,8 +18,10 @@ export function Learn() {
     const [userAnswer, setUserAnswer] = useState('')
     const [checkResult, setCheckResult] = useState<'correct' | 'incorrect' | null>(null)
     const [timeLeft, setTimeLeft] = useState(HELL_MODE_TIME)
+    const [promptLevel, setPromptLevel] = useState(0) // 0: Silent, 1: Semantic, 2: Sensory
     const inputRef = useRef<HTMLInputElement>(null)
     const timerRef = useRef<NodeJS.Timeout | null>(null)
+    const promptTimerRef = useRef<NodeJS.Timeout | null>(null)
 
     useEffect(() => {
         fetchTodayWords()
@@ -27,27 +29,47 @@ export function Learn() {
         return () => setHellMode(false)
     }, [])
 
-    // Timer logic for Hell Mode
+    // Main Timer logic (Hell Mode & Prompt System)
     useEffect(() => {
-        if (isHellMode && !isFlipped && !sessionComplete && todayWords.length > 0) {
-            setTimeLeft(HELL_MODE_TIME)
-            timerRef.current = setInterval(() => {
-                setTimeLeft((prev) => {
-                    if (prev <= 1) {
-                        // Timeout! Auto fail
-                        clearInterval(timerRef.current!)
-                        handleTimeout()
-                        return 0
-                    }
-                    return prev - 1
-                })
-            }, 1000)
-        } else {
-            if (timerRef.current) clearInterval(timerRef.current)
+        // Clear existing timers
+        if (timerRef.current) clearInterval(timerRef.current)
+        if (promptTimerRef.current) clearTimeout(promptTimerRef.current)
+
+        if (!isFlipped && !sessionComplete && todayWords.length > 0) {
+            // 1. Hell Mode Countdown
+            if (isHellMode) {
+                setTimeLeft(HELL_MODE_TIME)
+                timerRef.current = setInterval(() => {
+                    setTimeLeft((prev) => {
+                        if (prev <= 1) {
+                            clearInterval(timerRef.current!)
+                            handleTimeout()
+                            return 0
+                        }
+                        return prev - 1
+                    })
+                }, 1000)
+            }
+
+            // 2. Recall Prompt System (Auto-trigger)
+            // 0-7s: Silent (Effortful Recall)
+            // 7s: Semantic Prompt
+            // 12s: Sensory Prompt
+            setPromptLevel(0)
+            
+            // Set timeout for Level 1 (Semantic)
+            promptTimerRef.current = setTimeout(() => {
+                setPromptLevel(1)
+                // Set timeout for Level 2 (Sensory)
+                promptTimerRef.current = setTimeout(() => {
+                    setPromptLevel(2)
+                }, 5000) // +5s after Level 1 (Total 12s)
+            }, 7000) // 7s initial silence
         }
 
         return () => {
             if (timerRef.current) clearInterval(timerRef.current)
+            if (promptTimerRef.current) clearTimeout(promptTimerRef.current)
         }
     }, [currentIndex, isHellMode, isFlipped, sessionComplete, todayWords.length])
 
@@ -66,7 +88,10 @@ export function Learn() {
     const handleTimeout = () => {
         setCheckResult('incorrect')
         flipCard()
-        // Optionally auto-advance or force user to acknowledge failure
+        // Hell Mode: Auto fail after timeout
+        if (isHellMode) {
+            setTimeout(() => handleAnswer(1), 3000)
+        }
     }
 
     const handleAnswer = async (quality: Quality) => {
@@ -78,10 +103,79 @@ export function Learn() {
         const correct = currentWord.term.trim().toLowerCase() === userAnswer.trim().toLowerCase()
         setCheckResult(correct ? 'correct' : 'incorrect')
         
-        // Stop timer if correct/incorrect
+        // Stop timers
         if (timerRef.current) clearInterval(timerRef.current)
+        if (promptTimerRef.current) clearTimeout(promptTimerRef.current)
         
         flipCard()
+
+        // Hell Mode: Auto advance based on result
+        if (isHellMode) {
+            if (correct) {
+                setTimeout(() => handleAnswer(3), 1500) // Correct = Easy (3)
+            } else {
+                setTimeout(() => handleAnswer(1), 3500) // Incorrect = Again (1) - give time to review
+            }
+        }
+    }
+
+    // --- NEW PROMPT CONTENT GENERATOR ---
+    const getPromptContent = () => {
+        if (!currentWord || promptLevel === 0) return null
+
+        // Use simple placeholder with text to guarantee loading speed and reliability
+        const term = currentWord.term || 'Word'
+        // Dynamic color based on term length to make it look less static
+        const colors = ['1e40af', '3730a3', '4c1d95', '5b21b6', 'be123c', 'b91c1c', 'c2410c', 'b45309', '047857', '0f766e']
+        const color = colors[term.length % colors.length]
+        const imageUrl = currentWord.image_url || `https://placehold.co/400x300/${color}/ffffff?text=${encodeURIComponent(term.substring(0, 1).toUpperCase() + "...")}`
+
+        // LEVEL 1: SEMANTIC PROMPT (Meaning/Context Question)
+        if (promptLevel === 1) {
+            const question = currentWord.antonyms 
+                ? `Có phải trái nghĩa với "${currentWord.antonyms.split(',')[0]}"?`
+                : currentWord.synonyms
+                    ? `Có liên quan đến "${currentWord.synonyms.split(',')[0]}" không?`
+                    : `Hãy nghĩ về: ${currentWord.definition.slice(0, 20)}...`
+
+            return (
+                <div className="animate-slide-up absolute bottom-24 w-full max-w-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm p-4 rounded-2xl shadow-xl border-l-4 border-blue-500">
+                    <div className="flex items-start gap-3">
+                        <div className="p-2 bg-blue-100 rounded-full animate-pulse">
+                            <Lightbulb className="text-blue-600" size={20} />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-gray-800 dark:text-gray-200 text-sm uppercase">Gợi ý tư duy</h4>
+                            <p className="text-gray-600 dark:text-gray-300 text-lg italic">
+                                "{question}"
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+
+        // LEVEL 2: SENSORY PROMPT (Image + Sound)
+        if (promptLevel === 2) {
+            return (
+                <div className="animate-scale-in absolute inset-0 z-0 flex items-center justify-center pointer-events-none overflow-hidden opacity-20">
+                    {/* Background Image Placeholder (Blurry) */}
+                    <img 
+                        src={imageUrl} 
+                        alt="Hint" 
+                        className="w-full h-full object-cover filter blur-sm scale-110 transition-all duration-1000"
+                    />
+                    
+                    {/* Sound Hint Overlay */}
+                    <div className="absolute bottom-24 bg-red-500/90 text-white px-6 py-3 rounded-full shadow-lg animate-bounce">
+                        <span className="font-mono text-2xl font-bold mr-2">/{currentWord.phonetic?.split(' ')[0] || '...'}.../</span>
+                        <span className="text-sm font-medium opacity-80">Nghe quen không?</span>
+                    </div>
+                </div>
+            )
+        }
+
+        return null
     }
 
     const speak = (text: string) => {
@@ -92,6 +186,13 @@ export function Learn() {
 
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
         if (!currentWord || sessionComplete) return
+
+        // Hint shortcut (4) - Removed for now as Prompt system is automatic
+        // if (e.key === '4' && !isFlipped) {
+        //     e.preventDefault()
+        //     // showNextHint()
+        //     return
+        // }
 
         // If typing mode is active and card is NOT flipped (inputting)
         if (isTypingMode && !isFlipped) {
@@ -110,7 +211,7 @@ export function Learn() {
             else if (e.key === '2') handleAnswer(2)
             else if (e.key === '3') handleAnswer(3)
         }
-    }, [currentWord, isFlipped, sessionComplete, isTypingMode, userAnswer])
+    }, [currentWord, isFlipped, sessionComplete, isTypingMode, userAnswer, promptLevel])
 
     useEffect(() => {
         window.addEventListener('keydown', handleKeyDown)
@@ -232,7 +333,11 @@ export function Learn() {
                                     <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-8 text-center">
                                         {currentWord.definition}
                                     </h2>
-                                    <div className="w-full max-w-xs space-y-4">
+                                    
+                                    {/* Recall Prompts Overlay */}
+                                    {getPromptContent()}
+
+                                    <div className="w-full max-w-xs space-y-4 mt-6">
                                         <Input
                                             ref={inputRef}
                                             value={userAnswer}
@@ -255,9 +360,13 @@ export function Learn() {
                                     {currentWord.phonetic && (
                                         <p className="text-gray-500 text-lg mb-4">{currentWord.phonetic}</p>
                                     )}
+                                    
+                                    {/* Recall Prompts Overlay */}
+                                    {getPromptContent()}
+
                                     <button
                                         onClick={(e) => { e.stopPropagation(); speak(currentWord.term); }}
-                                        className="p-3 bg-primary-100 dark:bg-primary-900 rounded-full hover:bg-primary-200 transition-colors mb-4"
+                                        className="p-3 bg-primary-100 dark:bg-primary-900 rounded-full hover:bg-primary-200 transition-colors mb-4 mt-4"
                                     >
                                         <Volume2 className="text-primary-500" size={24} />
                                     </button>
@@ -278,7 +387,7 @@ export function Learn() {
                                         </span>
                                         {checkResult === 'incorrect' && (
                                             <div className="flex flex-col items-center mt-2 text-gray-500 dark:text-gray-400">
-                                                {timeLeft > 0 && <p className="text-sm">Bạn đã gõ: <span className="line-through font-medium text-red-400">{userAnswer}</span></p>}
+                                                {userAnswer && <p className="text-sm">Bạn đã gõ: <span className="line-through font-medium text-red-400">{userAnswer}</span></p>}
                                             </div>
                                         )}
                                     </div>
@@ -311,35 +420,48 @@ export function Learn() {
 
             {isFlipped && (
                 <div className="flex justify-center gap-4 mt-8">
-                    <button onClick={() => handleAnswer(1)}
-                        className="flex flex-col items-center gap-1 px-8 py-4 bg-red-100 dark:bg-red-900/30 rounded-xl hover:bg-red-200 transition-colors">
-                        <span className="text-2xl">😟</span>
-                        <span className="font-medium text-red-600">Chưa nhớ</span>
-                        <span className="text-xs text-gray-500">[1]</span>
-                    </button>
-                    {!isHellMode && (
-                        <button onClick={() => handleAnswer(2)}
-                            className="flex flex-col items-center gap-1 px-8 py-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl hover:bg-yellow-200 transition-colors">
-                            <span className="text-2xl">🤔</span>
-                            <span className="font-medium text-yellow-600">Tạm nhớ</span>
-                            <span className="text-xs text-gray-500">[2]</span>
-                        </button>
+                    {!isHellMode ? (
+                        <>
+                            <button onClick={() => handleAnswer(1)}
+                                className="flex flex-col items-center gap-1 px-8 py-4 bg-red-100 dark:bg-red-900/30 rounded-xl hover:bg-red-200 transition-colors">
+                                <span className="text-2xl">😟</span>
+                                <span className="font-medium text-red-600">Chưa nhớ</span>
+                                <span className="text-xs text-gray-500">[1]</span>
+                            </button>
+                            <button onClick={() => handleAnswer(2)}
+                                className="flex flex-col items-center gap-1 px-8 py-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl hover:bg-yellow-200 transition-colors">
+                                <span className="text-2xl">🤔</span>
+                                <span className="font-medium text-yellow-600">Tạm nhớ</span>
+                                <span className="text-xs text-gray-500">[2]</span>
+                            </button>
+                            <button onClick={() => handleAnswer(3)}
+                                className="flex flex-col items-center gap-1 px-8 py-4 bg-green-100 dark:bg-green-900/30 rounded-xl hover:bg-green-200 transition-colors">
+                                <span className="text-2xl">😊</span>
+                                <span className="font-medium text-green-600">Đã thuộc</span>
+                                <span className="text-xs text-gray-500">[3]</span>
+                            </button>
+                        </>
+                    ) : (
+                        <div className="flex items-center gap-3 text-lg font-bold animate-pulse">
+                            {checkResult === 'correct' ? (
+                                <span className="text-green-600">✨ Tuyệt vời! Đang chuyển tiếp...</span>
+                            ) : (
+                                <span className="text-red-600">💀 Sai rồi! Nhận hình phạt...</span>
+                            )}
+                        </div>
                     )}
-                    <button onClick={() => handleAnswer(3)}
-                        className="flex flex-col items-center gap-1 px-8 py-4 bg-green-100 dark:bg-green-900/30 rounded-xl hover:bg-green-200 transition-colors">
-                        <span className="text-2xl">😊</span>
-                        <span className="font-medium text-green-600">Đã thuộc</span>
-                        <span className="text-xs text-gray-500">[3]</span>
-                    </button>
                 </div>
             )}
 
             <div className="text-center text-sm text-gray-400 mt-4">
                 {isFlipped
                     ? (isHellMode ? '[1] Reset (Phạt) • [3] Đã thuộc' : '[1] Chưa nhớ • [2] Tạm nhớ • [3] Đã thuộc')
-                    : isTypingMode
-                        ? '[Enter] Kiểm tra'
-                        : '[Space] Lật thẻ'}
+                    : (
+                        <div className="flex gap-4 justify-center">
+                             {isTypingMode ? <span>[Enter] Kiểm tra</span> : <span>[Space] Lật thẻ</span>}
+                        </div>
+                    )
+                }
             </div>
         </div>
     )

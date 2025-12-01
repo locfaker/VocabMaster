@@ -43,50 +43,92 @@ export const useLearningStore = create<LearningStore>((set, get) => ({
 
     fetchTodayWords: async (deckId?: number) => {
         const today = format(new Date(), 'yyyy-MM-dd')
+        set({ sessionComplete: false, currentIndex: 0, isFlipped: false })
+        
         const targetId = deckId ?? get().targetDeckId
 
+        // SIMPLIFIED QUERY LOGIC TO DEBUG "NO WORDS" ISSUE
+        // We want:
+        // 1. Words that have NO progress record (New)
+        // 2. Words that have progress but status is 'new' (New)
+        // 3. Words that have progress and next_review <= today (Due)
+        // 4. Words that are currently 'learning' (Active)
+        
         let query = `
-      SELECT w.*, p.ease_factor, p.interval, p.repetitions, p.next_review, p.status, p.last_reviewed
-      FROM words w
-      LEFT JOIN progress p ON w.id = p.word_id
-      WHERE (p.status = 'new' OR p.status IS NULL OR p.next_review IS NULL OR p.next_review <= ?)
-    `
-        const params: unknown[] = [today]
+            SELECT w.id, w.term, w.definition, w.example, w.phonetic, w.image_url, w.deck_id,
+                   p.ease_factor, p.interval, p.repetitions, p.next_review, p.status, p.last_reviewed,
+                   w.synonyms, w.antonyms, w.word_family
+            FROM words w
+            LEFT JOIN progress p ON w.id = p.word_id
+            WHERE 1=1 
+        `
+        const params: unknown[] = []
 
         if (targetId) {
-            query += ' AND w.deck_id = ?'
+            query += ` AND w.deck_id = ? `
             params.push(targetId)
         }
 
-        // PRIORITIZE REVIEW WORDS FIRST, THEN NEW WORDS
-        // Increased LIMIT to 100 words per session
+        // If NOT in Cram Mode (Standard SRS)
+        // We append the SRS condition. 
+        // Using 1=1 allows us to easily append AND conditions
+        query += ` AND (
+            p.id IS NULL -- No progress record = New Word
+            OR p.status = 'new' 
+            OR p.status = 'learning'
+            OR p.next_review <= ?
+            OR p.next_review IS NULL
+        )`
+        params.push(today)
+
         query += ` ORDER BY 
-      CASE 
-        WHEN p.status = 'learning' OR p.status = 'review' THEN 1 
-        WHEN p.next_review <= ? THEN 2
-        ELSE 3 
-      END,
-      p.next_review ASC,
-      w.id ASC
-      LIMIT 100`
+            CASE 
+                WHEN p.next_review <= ? THEN 1 
+                WHEN p.status = 'learning' THEN 2
+                ELSE 3 
+            END,
+            w.id ASC
+            LIMIT 50`
         
-        // Add today parameter again for the ORDER BY clause
         params.push(today)
 
         try {
-            const words = await window.electronAPI.dbQuery<WordWithProgress>(query, params)
-            // Randomize NEW words slightly so we don't just get "A" words forever
-            // But keep Review words at the top
-            const reviews = words.filter(w => w.status === 'learning' || w.status === 'review')
-            const newWords = words.filter(w => w.status !== 'learning' && w.status !== 'review')
+            console.log("Fetching words with query:", query)
+            console.log("Params:", params)
             
-            // Simple shuffle for new words
-            for (let i = newWords.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [newWords[i], newWords[j]] = [newWords[j], newWords[i]];
+            let words = await window.electronAPI.dbQuery<WordWithProgress>(query, params)
+            console.log("Words found:", words.length)
+
+            // Fallback to Cram Mode if Deck is selected but empty result
+            if (words.length === 0 && targetId) {
+                console.log("Fallback: Fetching ANY words from deck")
+                // Just get words from this deck, ignoring SRS status
+                const cramQuery = `
+                    SELECT w.id, w.term, w.definition, w.example, w.phonetic, w.image_url, w.deck_id,
+                           p.ease_factor, p.interval, p.repetitions, p.next_review, p.status, p.last_reviewed,
+                           w.synonyms, w.antonyms, w.word_family
+                    FROM words w
+                    LEFT JOIN progress p ON w.id = p.word_id
+                    WHERE w.deck_id = ?
+                    LIMIT 20
+                `
+                words = await window.electronAPI.dbQuery<WordWithProgress>(cramQuery, [targetId])
+                console.log("Cram words found:", words.length)
             }
 
-            set({ todayWords: [...reviews, ...newWords], currentIndex: 0, isFlipped: false, sessionComplete: false })
+            if (words.length > 0) {
+                // Basic shuffle
+                const reviews = words.filter(w => w.status === 'learning' || w.status === 'review' || (w.next_review && w.next_review <= today))
+                const newWords = words.filter(w => !reviews.includes(w))
+                
+                for (let i = newWords.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [newWords[i], newWords[j]] = [newWords[j], newWords[i]];
+                }
+                set({ todayWords: [...reviews, ...newWords], currentIndex: 0, isFlipped: false, sessionComplete: false })
+            } else {
+                set({ todayWords: [] })
+            }
         } catch (e) {
             console.error('fetchTodayWords error:', e)
             set({ todayWords: [] })
@@ -124,10 +166,25 @@ export const useLearningStore = create<LearningStore>((set, get) => ({
         const word = todayWords[currentIndex]
         if (!word) return
 
+        // If "AGAIN" (Quality 1), we DON'T finish the card yet (Re-learning step)
+        // We push it to the back of the queue to see it again IN THIS SESSION
+        if (quality === 1) {
+             // Clone the word but keep its ID so we update the same DB record later
+             // Note: We don't update DB stats yet for "Again" to avoid spamming logs, 
+             // OR we update it to mark it as "learning" state but keep in session.
+             // Let's just push to queue for immediate re-drill.
+             const reLearningWord = { ...word }
+             set({ todayWords: [...todayWords, reLearningWord] })
+             
+             // However, we DO want to penalize the DB record immediately so if they quit, it's saved as "forgotten"
+        }
+
         const progress = {
             ease_factor: word.ease_factor ?? 2.5,
             interval: word.interval ?? 0,
-            repetitions: word.repetitions ?? 0
+            repetitions: word.repetitions ?? 0,
+            leitner_box: word.leitner_box ?? 1,
+            wrong_count: word.wrong_count ?? 0
         }
 
         const result = calculateNextReview(progress, quality, undefined, isHellMode)
@@ -139,9 +196,19 @@ export const useLearningStore = create<LearningStore>((set, get) => ({
             await window.electronAPI.dbRun(`
         UPDATE progress SET 
           ease_factor = ?, interval = ?, repetitions = ?, 
-          next_review = ?, status = ?, last_reviewed = CURRENT_TIMESTAMP
+          next_review = ?, status = ?, last_reviewed = CURRENT_TIMESTAMP,
+          leitner_box = ?, wrong_count = ?
         WHERE word_id = ?
-      `, [result.easeFactor, result.interval, result.repetitions, format(result.nextReview, 'yyyy-MM-dd'), result.status, word.id])
+      `, [
+            result.easeFactor, 
+            result.interval, 
+            result.repetitions, 
+            format(result.nextReview, 'yyyy-MM-dd'), 
+            result.status, 
+            result.leitnerBox, 
+            result.wrongCount,
+            word.id
+        ])
 
             // Update daily stats
             await window.electronAPI.dbRun(`

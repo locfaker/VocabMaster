@@ -44,7 +44,36 @@ function save() {
 function runMigrations() {
     // Core tables
     db.run(`CREATE TABLE IF NOT EXISTS decks (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, description TEXT, color TEXT, icon TEXT, word_count INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT)`)
+    
+    // Ensure words table has image_url
     db.run(`CREATE TABLE IF NOT EXISTS words (id INTEGER PRIMARY KEY AUTOINCREMENT, deck_id INTEGER, term TEXT, definition TEXT, example TEXT, phonetic TEXT, image_url TEXT, synonyms TEXT, antonyms TEXT, word_family TEXT, created_at TEXT)`)
+    
+    // Check if image_url column exists, if not add it (for existing databases)
+    try {
+        // Try to select image_url, if it fails, add column
+        db.exec("SELECT image_url FROM words LIMIT 1")
+    } catch (e) {
+        console.log("Adding missing image_url column to words table...")
+        try {
+            db.run("ALTER TABLE words ADD COLUMN image_url TEXT")
+        } catch (addErr) {
+            console.error("Failed to add image_url column:", addErr)
+        }
+    }
+
+    // Check if synonyms column exists
+    try {
+        db.exec("SELECT synonyms FROM words LIMIT 1")
+    } catch (e) {
+        console.log("Adding missing synonyms/antonyms/word_family columns...")
+        try {
+            db.run("ALTER TABLE words ADD COLUMN synonyms TEXT")
+            db.run("ALTER TABLE words ADD COLUMN antonyms TEXT")
+            db.run("ALTER TABLE words ADD COLUMN word_family TEXT")
+        } catch (err) {
+            console.error("Failed to add detail columns:", err)
+        }
+    }
 
     // Enhanced progress tracking with Leitner box support
     db.run(`CREATE TABLE IF NOT EXISTS progress (

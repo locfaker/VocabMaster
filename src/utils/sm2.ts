@@ -24,7 +24,7 @@ export interface SM2Result {
 export function calculateNextReview(
     progress: Partial<SM2Progress>,
     quality: Quality,
-    responseTime?: number,
+    _responseTime?: number,
     isHardcore: boolean = false // New param for Hell Mode
 ): SM2Result {
     let easeFactor = progress.ease_factor ?? 2.5
@@ -38,68 +38,69 @@ export function calculateNextReview(
     const q = quality === 1 ? 0 : quality === 2 ? 3 : 5
 
     if (q < 3) {
-        // Wrong answer - reset with penalty
-        repetitions = 0
-        interval = 1
+        // === WRONG ANSWER (AGAIN) ===
+        
+        // Reset streak
         correctStreak = 0
         wrongCount += 1
 
-        // Hell Mode Penalty: Reset to very beginning
         if (isHardcore) {
+            // Hell Mode: Brutal penalty
+            repetitions = 0
+            interval = 1
             leitnerBox = 1
-            easeFactor = Math.max(1.3, easeFactor - 0.3) // Heavy penalty
+            easeFactor = Math.max(1.3, easeFactor - 0.3)
         } else {
-            // Leitner: move back one box (min 1)
-            leitnerBox = Math.max(1, leitnerBox - 1)
-
-            // Decrease ease factor more for frequently wrong words
-            const penalty = Math.min(0.2, wrongCount * 0.05)
-            easeFactor = Math.max(1.3, easeFactor - penalty)
+            // Normal Mode: Soft Penalty (Smart Lapse)
+            // Instead of full reset, retain some progress to avoid frustration
+            // If word was mastered (interval > 21), cut interval by half instead of resetting to 1
+            if (interval > 21) {
+                interval = Math.ceil(interval * 0.4) // Keep 40% of interval
+                leitnerBox = Math.max(2, Math.ceil(leitnerBox / 2))
+            } else {
+                interval = 1
+                leitnerBox = 1
+            }
+            
+            // Slight ease penalty
+            easeFactor = Math.max(1.3, easeFactor - 0.15)
         }
     } else {
-        // Correct answer
+        // === CORRECT ANSWER (GOOD / EASY) ===
         repetitions += 1
         correctStreak += 1
 
-        // Leitner: advance box based on streak
-        if (correctStreak >= 2 && leitnerBox < 5) {
-            leitnerBox += 1
-        }
+        // Leitner: advance box
+        if (leitnerBox < 5) leitnerBox += 1
 
-        // Calculate interval based on Leitner box + SM-2
-        const leitnerIntervals = [1, 2, 4, 7, 14] // Days per box
-        const baseInterval = leitnerIntervals[leitnerBox - 1]
-
+        // Calculate Interval
         if (repetitions === 1) {
-            interval = baseInterval
+            interval = 1
         } else if (repetitions === 2) {
-            interval = Math.max(baseInterval, 6)
+            interval = 6
         } else {
+            // Standard SM-2 Formula
             interval = Math.round(interval * easeFactor)
         }
 
-        // Hell Mode: Slower growth (30% shorter intervals)
-        if (isHardcore) {
-            interval = Math.max(1, Math.round(interval * 0.7))
-        }
-
-        // Bonus for fast response (under 3 seconds)
-        if (responseTime && responseTime < 3000) {
-            interval = Math.round(interval * 1.1)
-        }
-
-        // Easy bonus
-        if (quality === 3) {
+        // Bonues adjustments
+        if (quality === 3) { // Easy
+            // Bonus for confident answer: extend interval more
             interval = Math.round(interval * 1.3)
-            leitnerBox = Math.min(5, leitnerBox + 1)
+            easeFactor += 0.15 // Reward easy words with higher growth rate
+        }
+
+        // Hardcore Mode dampener
+        if (isHardcore) {
+            interval = Math.max(1, Math.round(interval * 0.6))
         }
     }
 
-    // Update ease factor using SM-2 formula
-    easeFactor = Math.max(
-        1.3,
-        easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
-    )
+    // Update ease factor (standard SM-2)
+    // EF':= EF + (0.1 - (5-q) * (0.08 + (5-q)*0.02))
+    if (quality !== 1) { // Only adjust normally on success, fail logic is handled above
+        easeFactor = Math.max(1.3, easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)))
+    }
 
     // Calculate next review date
     const nextReview = new Date()
