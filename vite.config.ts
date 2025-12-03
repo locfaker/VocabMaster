@@ -13,6 +13,7 @@ export default defineConfig({
                 vite: {
                     build: {
                         outDir: 'dist-electron',
+                        minify: false,
                         rollupOptions: {
                             external: ['sql.js']
                         }
@@ -26,7 +27,8 @@ export default defineConfig({
                 },
                 vite: {
                     build: {
-                        outDir: 'dist-electron'
+                        outDir: 'dist-electron',
+                        minify: false
                     }
                 }
             }
@@ -36,6 +38,13 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src')
+        }
+    },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks: undefined
+            }
         }
     }
 })

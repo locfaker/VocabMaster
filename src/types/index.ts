@@ -1,3 +1,7 @@
+// ============================================
+// Core Entity Types
+// ============================================
+
 export interface Deck {
     id: number
     name: string
@@ -24,11 +28,13 @@ export interface Word {
 }
 
 export interface Progress {
+    word_id?: number
     ease_factor: number
     interval: number
     repetitions: number
     next_review: string | null
     status: 'new' | 'learning' | 'review' | 'mastered'
+    last_reviewed?: string | null
     leitner_box: number
     correct_streak: number
     wrong_count: number
@@ -51,7 +57,7 @@ export interface WordWithProgress extends Word {
 }
 
 export interface DailyStats {
-    id: number
+    id?: number
     date: string
     words_learned: number
     words_reviewed: number
@@ -92,44 +98,42 @@ export interface Reminder {
     days: string
 }
 
-export type Quality = 1 | 2 | 3 // 1=Again, 2=Good, 3=Easy
-export type StudyMode = 'flashcard' | 'quiz' | 'typing' | 'mixed'
-export type LeitnerBox = 1 | 2 | 3 | 4 | 5
+// Re-export learning types
+export type { Quality, StudyMode, LeitnerBox, QuizQuestion, TypingChallenge } from './learning'
 
-// Quiz types
-export interface QuizQuestion {
-    word: WordWithProgress
-    options: string[]
-    correctIndex: number
-    type: 'definition' | 'term' | 'audio'
+// ============================================
+// Electron API Types
+// ============================================
+
+export interface DbRunResult {
+    lastId: number
+    changes: number
 }
 
-// Typing challenge
-export interface TypingChallenge {
-    word: WordWithProgress
-    hint: string
-    maskedWord: string
+export interface ElectronAPI {
+    // Window controls
+    minimize: () => Promise<void>
+    maximize: () => Promise<void>
+    close: () => Promise<void>
+    // Theme
+    getTheme: () => Promise<string>
+    setTheme: (theme: string) => Promise<void>
+    // Database
+    dbQuery: <T = unknown>(sql: string, params?: unknown[]) => Promise<T[]>
+    dbRun: (sql: string, params?: unknown[]) => Promise<DbRunResult>
+    dbGet: <T = unknown>(sql: string, params?: unknown[]) => Promise<T | null>
+    // Mini mode
+    openMiniMode: () => Promise<void>
+    closeMiniMode: () => Promise<void>
+    // Notifications
+    showNotification: (title: string, body: string) => Promise<void>
+    // Reminder
+    setReminder: (time: string, enabled: boolean) => Promise<void>
 }
 
 declare global {
     interface Window {
-        electronAPI: {
-            minimize: () => Promise<void>
-            maximize: () => Promise<void>
-            close: () => Promise<void>
-            getTheme: () => Promise<string>
-            setTheme: (theme: string) => Promise<void>
-            dbQuery: <T = any>(sql: string, params?: any[]) => Promise<T[]>
-            dbRun: (sql: string, params?: any[]) => Promise<{ lastId: number; changes: number }>
-            dbGet: <T = any>(sql: string, params?: any[]) => Promise<T | null>
-            // Mini mode
-            openMiniMode: () => Promise<void>
-            closeMiniMode: () => Promise<void>
-            // Notifications
-            showNotification: (title: string, body: string) => Promise<void>
-            // Reminder
-            setReminder: (time: string, enabled: boolean) => Promise<void>
-        }
+        electronAPI: ElectronAPI
     }
 }
 

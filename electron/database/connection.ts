@@ -1,154 +1,363 @@
+// ============================================
+// Database Connection Module (sql.js)
+// ============================================
+
 import { app, ipcMain } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import { log, logError } from '../logger'
 
-let db: any = null
-let dbPath: string = ''
+// ============================================
+// Types
+// ============================================
+
+interface SqlJsDatabase {
+    run: (sql: string) => void
+    exec: (sql: string) => Array<{ columns: string[]; values: unknown[][] }>
+    export: () => Uint8Array
+    getRowsModified: () => number
+}
+
+// ============================================
+// State
+// ============================================
+
+let db: SqlJsDatabase | null = null
+let dbPath = ''
+let dbInitialized = false
+
+// ============================================
+// Public API
+// ============================================
+
+export function isDatabaseReady(): boolean {
+    return dbInitialized && db !== null
+}
 
 export async function initDatabase(): Promise<void> {
+    log('Initializing Database Module...')
+
     const userDataPath = app.getPath('userData')
     dbPath = path.join(userDataPath, 'vocabmaster.db')
+    log('Database path:', dbPath)
 
+    // Ensure directory exists
     if (!fs.existsSync(userDataPath)) {
+        log('Creating userData directory')
         fs.mkdirSync(userDataPath, { recursive: true })
     }
 
-    const initSqlJs = (await import('sql.js')).default
-    let wasmPath = app.isPackaged
-        ? path.join(process.resourcesPath, 'sql-wasm.wasm')
-        : path.join(app.getAppPath(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm')
+    // Load WASM
+    const wasmPath = getWasmPath()
+    log('Loading SQL.js with WASM binary...')
+    const wasmBinary = fs.readFileSync(wasmPath)
 
-    console.log('Initializing DB with wasm path:', wasmPath)
+    // Initialize sql.js
+    const sqlJsModule = await import('sql.js')
+    const initSqlJs = sqlJsModule.default || sqlJsModule
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SQL = await initSqlJs({ wasmBinary: wasmBinary as unknown as ArrayBuffer })
 
-    if (!app.isPackaged && !fs.existsSync(wasmPath)) {
-        console.warn('Wasm file not found at calculated path, trying fallback...')
-        const fallbackPath = path.join(__dirname, '../../node_modules/sql.js/dist/sql-wasm.wasm')
-        if (fs.existsSync(fallbackPath)) {
-            console.log('Found wasm at fallback path:', fallbackPath)
-            wasmPath = fallbackPath
-        }
-    }
-
-    const SQL = await initSqlJs({ locateFile: () => wasmPath })
-    db = fs.existsSync(dbPath) ? new SQL.Database(fs.readFileSync(dbPath)) : new SQL.Database()
+    // Open or create database
+    log('Opening Database connection...')
+    db = fs.existsSync(dbPath)
+        ? new SQL.Database(fs.readFileSync(dbPath))
+        : new SQL.Database()
 
     runMigrations()
     save()
-    console.log('DB ready:', dbPath)
+    dbInitialized = true
+    log('Database Ready & Saved')
 }
 
-function save() {
-    fs.writeFileSync(dbPath, Buffer.from(db.export()))
+export function setupDatabaseIPC(): void {
+    log('Setting up Database IPC...')
+
+    ipcMain.handle('db:query', (_, sql: string, params: unknown[]) => {
+        if (!db) {
+            logError('IPC db:query called but DB not initialized')
+            return []
+        }
+
+        try {
+            const finalSql = params?.length ? buildSql(sql, params) : sql
+            const result = db.exec(finalSql)
+
+            if (!result.length) return []
+
+            const { columns, values } = result[0]
+            return values.map((row) => {
+                const obj: Record<string, unknown> = {}
+                columns.forEach((col, i) => (obj[col] = row[i]))
+                return obj
+            })
+        } catch (e) {
+            logError('query err:', e)
+            return []
+        }
+    })
+
+    ipcMain.handle('db:run', (_, sql: string, params: unknown[]) => {
+        if (!db) {
+            logError('IPC db:run called but DB not initialized')
+            return { lastId: 0, changes: 0 }
+        }
+
+        try {
+            const finalSql = params?.length ? buildSql(sql, params) : sql
+            log('RUN SQL:', finalSql.slice(0, 60))
+
+            db.run(finalSql)
+            const changes = db.getRowsModified()
+
+            // Get lastId immediately after run
+            const res = db.exec('SELECT last_insert_rowid() as id')
+            const lastId = Number(res[0]?.values[0]?.[0] || 0)
+
+            save()
+            return { lastId, changes }
+        } catch (e) {
+            logError('run err:', e)
+            return { lastId: 0, changes: 0 }
+        }
+    })
+
+    ipcMain.handle('db:get', (_, sql: string, params: unknown[]) => {
+        if (!db) {
+            logError('IPC db:get called but DB not initialized')
+            return null
+        }
+
+        try {
+            const finalSql = params?.length ? buildSql(sql, params) : sql
+            const result = db.exec(finalSql)
+
+            if (!result.length || !result[0].values.length) return null
+
+            const { columns, values } = result[0]
+            const obj: Record<string, unknown> = {}
+            columns.forEach((col, i) => (obj[col] = values[0][i]))
+            return obj
+        } catch (e) {
+            logError('get err:', e)
+            return null
+        }
+    })
 }
 
-function runMigrations() {
-    // Core tables
-    db.run(`CREATE TABLE IF NOT EXISTS decks (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, description TEXT, color TEXT, icon TEXT, word_count INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT)`)
-    
-    // Ensure words table has image_url
-    db.run(`CREATE TABLE IF NOT EXISTS words (id INTEGER PRIMARY KEY AUTOINCREMENT, deck_id INTEGER, term TEXT, definition TEXT, example TEXT, phonetic TEXT, image_url TEXT, synonyms TEXT, antonyms TEXT, word_family TEXT, created_at TEXT)`)
-    
-    // Check if image_url column exists, if not add it (for existing databases)
-    try {
-        // Try to select image_url, if it fails, add column
-        db.exec("SELECT image_url FROM words LIMIT 1")
-    } catch (e) {
-        console.log("Adding missing image_url column to words table...")
-        try {
-            db.run("ALTER TABLE words ADD COLUMN image_url TEXT")
-        } catch (addErr) {
-            console.error("Failed to add image_url column:", addErr)
+// ============================================
+// Private Helpers
+// ============================================
+
+function getWasmPath(): string {
+    let wasmPath: string
+
+    if (app.isPackaged) {
+        wasmPath = path.join(process.resourcesPath, 'sql-wasm.wasm')
+        log('Running in Packaged Mode. Expected WASM path:', wasmPath)
+
+        if (!fs.existsSync(wasmPath)) {
+            const errorMsg = `CRITICAL: sql-wasm.wasm missing at ${wasmPath}`
+            logError(errorMsg)
+            throw new Error(errorMsg)
         }
+    } else {
+        wasmPath = path.join(app.getAppPath(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm')
+        log('Running in Dev Mode. WASM path:', wasmPath)
     }
 
-    // Check if synonyms column exists
+    return wasmPath
+}
+
+function save(): void {
+    if (!db) return
+
     try {
-        db.exec("SELECT synonyms FROM words LIMIT 1")
+        fs.writeFileSync(dbPath, Buffer.from(db.export()))
     } catch (e) {
-        console.log("Adding missing synonyms/antonyms/word_family columns...")
-        try {
-            db.run("ALTER TABLE words ADD COLUMN synonyms TEXT")
-            db.run("ALTER TABLE words ADD COLUMN antonyms TEXT")
-            db.run("ALTER TABLE words ADD COLUMN word_family TEXT")
-        } catch (err) {
-            console.error("Failed to add detail columns:", err)
-        }
+        logError('Failed to save database', e)
     }
+}
 
-    // Enhanced progress tracking with Leitner box support
-    db.run(`CREATE TABLE IF NOT EXISTS progress (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        word_id INTEGER UNIQUE, 
-        ease_factor REAL DEFAULT 2.5, 
-        interval INTEGER DEFAULT 0, 
-        repetitions INTEGER DEFAULT 0, 
-        next_review TEXT, 
-        status TEXT DEFAULT 'new', 
-        last_reviewed TEXT,
-        leitner_box INTEGER DEFAULT 1,
-        correct_streak INTEGER DEFAULT 0,
-        wrong_count INTEGER DEFAULT 0,
-        total_reviews INTEGER DEFAULT 0,
-        avg_response_time INTEGER DEFAULT 0
-    )`)
+function escapeValue(val: unknown): string {
+    if (val === null || val === undefined) return 'NULL'
+    if (typeof val === 'number') return String(val)
+    return "'" + String(val).replace(/'/g, "''") + "'"
+}
 
-    // Enhanced daily stats
-    db.run(`CREATE TABLE IF NOT EXISTS stats (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        date TEXT UNIQUE, 
-        words_learned INTEGER DEFAULT 0, 
-        words_reviewed INTEGER DEFAULT 0, 
-        correct_count INTEGER DEFAULT 0, 
-        time_spent INTEGER DEFAULT 0, 
-        xp_earned INTEGER DEFAULT 0,
-        quiz_score INTEGER DEFAULT 0,
-        typing_score INTEGER DEFAULT 0,
-        streak_maintained INTEGER DEFAULT 0
-    )`)
+function buildSql(sql: string, params: unknown[]): string {
+    let i = 0
+    return sql.replace(/\?/g, () => escapeValue(params[i++]))
+}
 
-    // Settings
+// ============================================
+// Migrations
+// ============================================
+
+function runMigrations(): void {
+    if (!db) return
+
+    log('Running Migrations...')
+
+    try {
+        // Core tables
+        createCoreTables()
+        addMissingColumns()
+        initDefaultSettings()
+        initAchievements()
+
+        log('Migrations completed.')
+    } catch (e) {
+        logError('Migration failed', e)
+        throw e
+    }
+}
+
+function createCoreTables(): void {
+    if (!db) return
+
+    db.run(`
+    CREATE TABLE IF NOT EXISTS decks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      description TEXT,
+      color TEXT,
+      icon TEXT,
+      word_count INTEGER DEFAULT 0,
+      created_at TEXT,
+      updated_at TEXT
+    )
+  `)
+
+    db.run(`
+    CREATE TABLE IF NOT EXISTS words (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      deck_id INTEGER,
+      term TEXT,
+      definition TEXT,
+      example TEXT,
+      phonetic TEXT,
+      image_url TEXT,
+      synonyms TEXT,
+      antonyms TEXT,
+      word_family TEXT,
+      created_at TEXT
+    )
+  `)
+
+    db.run(`
+    CREATE TABLE IF NOT EXISTS progress (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      word_id INTEGER UNIQUE,
+      ease_factor REAL DEFAULT 2.5,
+      interval INTEGER DEFAULT 0,
+      repetitions INTEGER DEFAULT 0,
+      next_review TEXT,
+      status TEXT DEFAULT 'new',
+      last_reviewed TEXT,
+      leitner_box INTEGER DEFAULT 1,
+      correct_streak INTEGER DEFAULT 0,
+      wrong_count INTEGER DEFAULT 0,
+      total_reviews INTEGER DEFAULT 0,
+      avg_response_time INTEGER DEFAULT 0
+    )
+  `)
+
+    db.run(`
+    CREATE TABLE IF NOT EXISTS stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT UNIQUE,
+      words_learned INTEGER DEFAULT 0,
+      words_reviewed INTEGER DEFAULT 0,
+      correct_count INTEGER DEFAULT 0,
+      time_spent INTEGER DEFAULT 0,
+      xp_earned INTEGER DEFAULT 0,
+      quiz_score INTEGER DEFAULT 0,
+      typing_score INTEGER DEFAULT 0,
+      streak_maintained INTEGER DEFAULT 0
+    )
+  `)
+
     db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`)
 
-    // Achievements table
-    db.run(`CREATE TABLE IF NOT EXISTS achievements (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT UNIQUE NOT NULL,
-        name TEXT NOT NULL,
-        description TEXT,
-        icon TEXT,
-        xp_reward INTEGER DEFAULT 0,
-        unlocked_at TEXT,
-        progress INTEGER DEFAULT 0,
-        target INTEGER DEFAULT 1
-    )`)
+    db.run(`
+    CREATE TABLE IF NOT EXISTS achievements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      icon TEXT,
+      xp_reward INTEGER DEFAULT 0,
+      unlocked_at TEXT,
+      progress INTEGER DEFAULT 0,
+      target INTEGER DEFAULT 1
+    )
+  `)
 
-    // Study sessions for detailed tracking
-    db.run(`CREATE TABLE IF NOT EXISTS study_sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        started_at TEXT,
-        ended_at TEXT,
-        mode TEXT,
-        words_studied INTEGER DEFAULT 0,
-        correct_count INTEGER DEFAULT 0,
-        xp_earned INTEGER DEFAULT 0
-    )`)
+    db.run(`
+    CREATE TABLE IF NOT EXISTS study_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      started_at TEXT,
+      ended_at TEXT,
+      mode TEXT,
+      words_studied INTEGER DEFAULT 0,
+      correct_count INTEGER DEFAULT 0,
+      xp_earned INTEGER DEFAULT 0
+    )
+  `)
 
-    // Reminder settings
-    db.run(`CREATE TABLE IF NOT EXISTS reminders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        time TEXT,
-        enabled INTEGER DEFAULT 1,
-        days TEXT DEFAULT '1,2,3,4,5,6,0'
-    )`)
-
-    // Initialize default settings
-    initDefaultSettings()
-
-    // Initialize achievements
-    initAchievements()
+    db.run(`
+    CREATE TABLE IF NOT EXISTS reminders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      time TEXT,
+      enabled INTEGER DEFAULT 1,
+      days TEXT DEFAULT '1,2,3,4,5,6,0'
+    )
+  `)
 }
 
-function initDefaultSettings() {
+function addMissingColumns(): void {
+    if (!db) return
+
+    // Words table columns
+    const wordColumns = ['image_url', 'synonyms', 'antonyms', 'word_family']
+    for (const col of wordColumns) {
+        tryAddColumn('words', col, 'TEXT')
+    }
+
+    // Progress table columns
+    const progressColumns = [
+        { name: 'leitner_box', default: '1' },
+        { name: 'correct_streak', default: '0' },
+        { name: 'wrong_count', default: '0' },
+        { name: 'total_reviews', default: '0' },
+        { name: 'avg_response_time', default: '0' },
+    ]
+    for (const { name, default: def } of progressColumns) {
+        tryAddColumn('progress', name, `INTEGER DEFAULT ${def}`)
+    }
+
+    // Stats table columns
+    const statsColumns = ['quiz_score', 'typing_score', 'streak_maintained']
+    for (const col of statsColumns) {
+        tryAddColumn('stats', col, 'INTEGER DEFAULT 0')
+    }
+}
+
+function tryAddColumn(table: string, column: string, type: string): void {
+    if (!db) return
+
+    try {
+        db.exec(`SELECT ${column} FROM ${table} LIMIT 1`)
+    } catch {
+        log(`Adding missing column to ${table}: ${column}`)
+        db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
+    }
+}
+
+function initDefaultSettings(): void {
+    if (!db) return
+
     const defaults = [
         ['theme', 'system'],
         ['daily_goal', '20'],
@@ -158,14 +367,17 @@ function initDefaultSettings() {
         ['reminder_enabled', 'true'],
         ['reminder_time', '09:00'],
         ['sound_enabled', 'true'],
-        ['mini_mode_opacity', '0.95']
+        ['mini_mode_opacity', '0.95'],
     ]
-    defaults.forEach(([key, value]) => {
+
+    for (const [key, value] of defaults) {
         db.run(`INSERT OR IGNORE INTO settings (key, value) VALUES ('${key}', '${value}')`)
-    })
+    }
 }
 
-function initAchievements() {
+function initAchievements(): void {
+    if (!db) return
+
     const achievements = [
         ['first_word', 'Khởi đầu', 'Học từ đầu tiên', '🌱', 10, 1],
         ['words_10', 'Người học chăm chỉ', 'Học 10 từ', '📚', 25, 10],
@@ -180,87 +392,13 @@ function initAchievements() {
         ['night_owl', 'Cú đêm', 'Học sau 22h', '🦉', 15, 1],
         ['early_bird', 'Chim sớm', 'Học trước 7h', '🐦', 15, 1],
         ['mastered_10', 'Thành thạo', 'Thuộc 10 từ', '✅', 50, 10],
-        ['mastered_50', 'Chuyên gia', 'Thuộc 50 từ', '🌟', 150, 50]
+        ['mastered_50', 'Chuyên gia', 'Thuộc 50 từ', '🌟', 150, 50],
     ]
-    achievements.forEach(([type, name, desc, icon, xp, target]) => {
-        db.run(`INSERT OR IGNORE INTO achievements (type, name, description, icon, xp_reward, target) VALUES ('${type}', '${name}', '${desc}', '${icon}', ${xp}, ${target})`)
-    })
-}
 
-function esc(val: any): string {
-    if (val === null || val === undefined) return 'NULL'
-    if (typeof val === 'number') return String(val)
-    return "'" + String(val).replace(/'/g, "''") + "'"
-}
-
-function buildSql(sql: string, params: any[]): string {
-    let i = 0
-    return sql.replace(/\?/g, () => esc(params[i++]))
-}
-
-export function setupDatabaseIPC() {
-    ipcMain.handle('db:query', (_, sql: string, params: any[]) => {
-        if (!db) {
-            console.error('DB not initialized')
-            return []
-        }
-        try {
-            const finalSql = params?.length ? buildSql(sql, params) : sql
-            const result = db.exec(finalSql)
-            if (!result.length) return []
-            const { columns, values } = result[0]
-            return values.map((row: any[]) => {
-                const obj: any = {}
-                columns.forEach((col: string, i: number) => obj[col] = row[i])
-                return obj
-            })
-        } catch (e) {
-            console.error('query err:', e)
-            return []
-        }
-    })
-
-    ipcMain.handle('db:run', (_, sql: string, params: any[]) => {
-        if (!db) {
-            console.error('DB not initialized')
-            return { lastId: 0, changes: 0 }
-        }
-        try {
-            const finalSql = params?.length ? buildSql(sql, params) : sql
-            console.log('RUN:', finalSql.slice(0, 60))
-
-            db.run(finalSql)
-            const changes = db.getRowsModified()
-
-            // Get lastId IMMEDIATELY after run, before anything else
-            const res = db.exec('SELECT last_insert_rowid() as id')
-            const lastId = Number(res[0]?.values[0]?.[0] || 0)
-
-            save()
-            console.log('=> id:', lastId, 'changes:', changes)
-            return { lastId, changes }
-        } catch (e) {
-            console.error('run err:', e)
-            return { lastId: 0, changes: 0 }
-        }
-    })
-
-    ipcMain.handle('db:get', (_, sql: string, params: any[]) => {
-        if (!db) {
-            console.error('DB not initialized')
-            return null
-        }
-        try {
-            const finalSql = params?.length ? buildSql(sql, params) : sql
-            const result = db.exec(finalSql)
-            if (!result.length || !result[0].values.length) return null
-            const { columns, values } = result[0]
-            const obj: any = {}
-            columns.forEach((col: string, i: number) => obj[col] = values[0][i])
-            return obj
-        } catch (e) {
-            console.error('get err:', e)
-            return null
-        }
-    })
+    for (const [type, name, desc, icon, xp, target] of achievements) {
+        db.run(`
+      INSERT OR IGNORE INTO achievements (type, name, description, icon, xp_reward, target)
+      VALUES ('${type}', '${name}', '${desc}', '${icon}', ${xp}, ${target})
+    `)
+    }
 }

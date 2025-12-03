@@ -1,36 +1,27 @@
+// ============================================
+// SM-2 Spaced Repetition Algorithm
+// Enhanced with Leitner Box System
+// ============================================
+
 import type { Quality } from '@/types'
+import type { SM2Progress, SM2Result, LevelInfo, WordStatus } from '@/types/learning'
+import { SM2, XP, LEVELS } from '@/constants'
 
-export interface SM2Progress {
-    ease_factor: number
-    interval: number
-    repetitions: number
-    leitner_box: number
-    correct_streak: number
-    wrong_count: number
-}
-
-export interface SM2Result {
-    easeFactor: number
-    interval: number
-    repetitions: number
-    nextReview: Date
-    status: 'new' | 'learning' | 'review' | 'mastered'
-    leitnerBox: number
-    correctStreak: number
-    wrongCount: number
-}
-
-// Enhanced SM-2 Algorithm with Leitner Box integration
+/**
+ * Calculate next review date using enhanced SM-2 algorithm
+ * Combines SM-2 with Leitner Box for optimal retention
+ */
 export function calculateNextReview(
     progress: Partial<SM2Progress>,
     quality: Quality,
     _responseTime?: number,
-    isHardcore: boolean = false // New param for Hell Mode
+    isHardcore = false
 ): SM2Result {
-    let easeFactor = progress.ease_factor ?? 2.5
-    let interval = progress.interval ?? 0
+    // Initialize with defaults
+    let easeFactor = progress.ease_factor ?? SM2.DEFAULT_EASE_FACTOR
+    let interval = progress.interval ?? SM2.DEFAULT_INTERVAL
     let repetitions = progress.repetitions ?? 0
-    let leitnerBox = progress.leitner_box ?? 1
+    let leitnerBox = progress.leitner_box ?? SM2.DEFAULT_LEITNER_BOX
     let correctStreak = progress.correct_streak ?? 0
     let wrongCount = progress.wrong_count ?? 0
 
@@ -38,9 +29,7 @@ export function calculateNextReview(
     const q = quality === 1 ? 0 : quality === 2 ? 3 : 5
 
     if (q < 3) {
-        // === WRONG ANSWER (AGAIN) ===
-        
-        // Reset streak
+        // === WRONG ANSWER ===
         correctStreak = 0
         wrongCount += 1
 
@@ -49,57 +38,55 @@ export function calculateNextReview(
             repetitions = 0
             interval = 1
             leitnerBox = 1
-            easeFactor = Math.max(1.3, easeFactor - 0.3)
+            easeFactor = Math.max(SM2.MIN_EASE_FACTOR, easeFactor - 0.3)
         } else {
-            // Normal Mode: Soft Penalty (Smart Lapse)
-            // Instead of full reset, retain some progress to avoid frustration
-            // If word was mastered (interval > 21), cut interval by half instead of resetting to 1
-            if (interval > 21) {
-                interval = Math.ceil(interval * 0.4) // Keep 40% of interval
+            // Normal Mode: Smart Lapse - retain some progress
+            if (interval > SM2.MASTERY_INTERVAL) {
+                interval = Math.ceil(interval * 0.4)
                 leitnerBox = Math.max(2, Math.ceil(leitnerBox / 2))
             } else {
                 interval = 1
                 leitnerBox = 1
             }
-            
-            // Slight ease penalty
-            easeFactor = Math.max(1.3, easeFactor - 0.15)
+            easeFactor = Math.max(SM2.MIN_EASE_FACTOR, easeFactor - 0.15)
         }
     } else {
-        // === CORRECT ANSWER (GOOD / EASY) ===
+        // === CORRECT ANSWER ===
         repetitions += 1
         correctStreak += 1
 
-        // Leitner: advance box
-        if (leitnerBox < 5) leitnerBox += 1
+        // Advance Leitner box
+        if (leitnerBox < SM2.MAX_LEITNER_BOX) {
+            leitnerBox += 1
+        }
 
-        // Calculate Interval
+        // Calculate interval
         if (repetitions === 1) {
             interval = 1
         } else if (repetitions === 2) {
             interval = 6
         } else {
-            // Standard SM-2 Formula
             interval = Math.round(interval * easeFactor)
         }
 
-        // Bonues adjustments
-        if (quality === 3) { // Easy
-            // Bonus for confident answer: extend interval more
+        // Easy bonus
+        if (quality === 3) {
             interval = Math.round(interval * 1.3)
-            easeFactor += 0.15 // Reward easy words with higher growth rate
+            easeFactor += 0.15
         }
 
-        // Hardcore Mode dampener
+        // Hardcore dampener
         if (isHardcore) {
             interval = Math.max(1, Math.round(interval * 0.6))
         }
     }
 
-    // Update ease factor (standard SM-2)
-    // EF':= EF + (0.1 - (5-q) * (0.08 + (5-q)*0.02))
-    if (quality !== 1) { // Only adjust normally on success, fail logic is handled above
-        easeFactor = Math.max(1.3, easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)))
+    // Update ease factor (standard SM-2 formula)
+    if (quality !== 1) {
+        easeFactor = Math.max(
+            SM2.MIN_EASE_FACTOR,
+            easeFactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
+        )
     }
 
     // Calculate next review date
@@ -107,16 +94,7 @@ export function calculateNextReview(
     nextReview.setDate(nextReview.getDate() + interval)
 
     // Determine status
-    let status: SM2Result['status']
-    if (repetitions === 0) {
-        status = 'learning'
-    } else if (leitnerBox >= 5 && interval >= 21) {
-        status = 'mastered'
-    } else if (interval >= 7) {
-        status = 'review'
-    } else {
-        status = 'learning'
-    }
+    const status = determineStatus(repetitions, leitnerBox, interval)
 
     return {
         easeFactor,
@@ -126,70 +104,82 @@ export function calculateNextReview(
         status,
         leitnerBox,
         correctStreak,
-        wrongCount
+        wrongCount,
     }
 }
 
-// XP calculation with bonuses
-export function getXPForQuality(quality: Quality, streak: number = 0, isQuiz: boolean = false): number {
-    const baseXP = quality === 1 ? 5 : quality === 2 ? 10 : 15
+/**
+ * Determine word status based on progress
+ */
+function determineStatus(
+    repetitions: number,
+    leitnerBox: number,
+    interval: number
+): WordStatus {
+    if (repetitions === 0) return 'learning'
+    if (leitnerBox >= SM2.MAX_LEITNER_BOX && interval >= SM2.MASTERY_INTERVAL) return 'mastered'
+    if (interval >= SM2.REVIEW_INTERVAL) return 'review'
+    return 'learning'
+}
 
-    // Streak bonus (up to 50% extra)
-    const streakBonus = Math.min(streak * 0.05, 0.5)
-
-    // Quiz bonus (20% extra)
-    const quizBonus = isQuiz ? 0.2 : 0
+/**
+ * Calculate XP earned for an answer
+ */
+export function getXPForQuality(
+    quality: Quality,
+    streak = 0,
+    isQuiz = false
+): number {
+    const baseXP = quality === 1 ? XP.AGAIN : quality === 2 ? XP.GOOD : XP.EASY
+    const streakBonus = Math.min(streak * XP.STREAK_BONUS_PER_DAY, XP.MAX_STREAK_BONUS)
+    const quizBonus = isQuiz ? XP.QUIZ_BONUS : 0
 
     return Math.round(baseXP * (1 + streakBonus + quizBonus))
 }
 
-// Calculate level from XP
-export function calculateLevel(totalXP: number): { level: number; title: string; progress: number; nextLevelXP: number } {
-    const levels = [
-        { xp: 0, title: 'Beginner' },
-        { xp: 100, title: 'Learner' },
-        { xp: 300, title: 'Student' },
-        { xp: 600, title: 'Intermediate' },
-        { xp: 1000, title: 'Advanced' },
-        { xp: 1500, title: 'Expert' },
-        { xp: 2500, title: 'Master' },
-        { xp: 4000, title: 'Grandmaster' },
-        { xp: 6000, title: 'Legend' },
-        { xp: 10000, title: 'Vocabulary God' }
-    ]
-
+/**
+ * Calculate level info from total XP
+ */
+export function calculateLevel(totalXP: number): LevelInfo {
     let currentLevel = 1
-    let currentTitle = 'Beginner'
-    let nextLevelXP = 100
+    let currentTitle: string = LEVELS[0].title
+    let nextLevelXP: number = LEVELS[1]?.xp ?? LEVELS[0].xp
 
-    for (let i = levels.length - 1; i >= 0; i--) {
-        if (totalXP >= levels[i].xp) {
+    for (let i = LEVELS.length - 1; i >= 0; i--) {
+        if (totalXP >= LEVELS[i].xp) {
             currentLevel = i + 1
-            currentTitle = levels[i].title
-            nextLevelXP = levels[i + 1]?.xp || levels[i].xp
+            currentTitle = LEVELS[i].title
+            nextLevelXP = LEVELS[i + 1]?.xp ?? LEVELS[i].xp
             break
         }
     }
 
-    const prevLevelXP = levels[currentLevel - 1]?.xp || 0
+    const prevLevelXP = LEVELS[currentLevel - 1]?.xp ?? 0
     const progress = nextLevelXP > prevLevelXP
         ? ((totalXP - prevLevelXP) / (nextLevelXP - prevLevelXP)) * 100
         : 100
 
-    return { level: currentLevel, title: currentTitle, progress: Math.min(progress, 100), nextLevelXP }
+    return {
+        level: currentLevel,
+        title: currentTitle,
+        progress: Math.min(progress, 100),
+        nextLevelXP,
+    }
 }
 
-// Predict mastery date
+/**
+ * Predict mastery date based on current progress
+ */
 export function predictMasteryDate(progress: Partial<SM2Progress>): Date | null {
     const leitnerBox = progress.leitner_box ?? 1
 
-    if (leitnerBox >= 5) return new Date() // Already mastered
+    if (leitnerBox >= SM2.MAX_LEITNER_BOX) return new Date()
 
-    // Estimate days needed based on current progress
+    // Average days per box advancement
     const avgDaysPerBox = [1, 3, 5, 10, 14]
-
     let totalDays = 0
-    for (let i = leitnerBox - 1; i < 5; i++) {
+
+    for (let i = leitnerBox - 1; i < SM2.MAX_LEITNER_BOX; i++) {
         totalDays += avgDaysPerBox[i]
     }
 
@@ -198,7 +188,9 @@ export function predictMasteryDate(progress: Partial<SM2Progress>): Date | null 
     return masteryDate
 }
 
-// Smart review priority scoring
+/**
+ * Calculate review priority score for smart ordering
+ */
 export function calculateReviewPriority(word: {
     ease_factor?: number | null
     wrong_count?: number | null
@@ -208,21 +200,21 @@ export function calculateReviewPriority(word: {
 }): number {
     let priority = 50 // Base priority
 
-    // Higher priority for difficult words (low ease factor)
-    const easeFactor = word.ease_factor ?? 2.5
-    priority += (2.5 - easeFactor) * 20
+    // Higher priority for difficult words
+    const easeFactor = word.ease_factor ?? SM2.DEFAULT_EASE_FACTOR
+    priority += (SM2.DEFAULT_EASE_FACTOR - easeFactor) * 20
 
     // Higher priority for frequently wrong words
-    const wrongCount = word.wrong_count ?? 0
-    priority += wrongCount * 5
+    priority += (word.wrong_count ?? 0) * 5
 
     // Lower priority for words with good streak
-    const correctStreak = word.correct_streak ?? 0
-    priority -= correctStreak * 3
+    priority -= (word.correct_streak ?? 0) * 3
 
     // Overdue words get higher priority
     if (word.next_review) {
-        const daysOverdue = Math.floor((Date.now() - new Date(word.next_review).getTime()) / (1000 * 60 * 60 * 24))
+        const daysOverdue = Math.floor(
+            (Date.now() - new Date(word.next_review).getTime()) / (1000 * 60 * 60 * 24)
+        )
         if (daysOverdue > 0) {
             priority += daysOverdue * 10
         }

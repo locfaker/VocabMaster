@@ -1,18 +1,45 @@
+// ============================================
+// Achievement Store - Zustand State Management
+// ============================================
+
 import { create } from 'zustand'
 import type { Achievement } from '@/types'
+import { DB } from '@/constants'
 
-interface AchievementStore {
+// ============================================
+// Types
+// ============================================
+
+type SpecialAchievementType = 'perfect_quiz' | 'speed_demon' | 'night_owl' | 'early_bird'
+
+interface AchievementState {
     achievements: Achievement[]
     unlockedRecently: Achievement | null
+}
 
+interface AchievementActions {
     fetchAchievements: () => Promise<void>
     checkAndUnlock: (type: string, currentValue: number) => Promise<Achievement | null>
     clearRecentUnlock: () => void
 }
 
-export const useAchievementStore = create<AchievementStore>((set, get) => ({
+type AchievementStore = AchievementState & AchievementActions
+
+// ============================================
+// Initial State
+// ============================================
+
+const initialState: AchievementState = {
     achievements: [],
     unlockedRecently: null,
+}
+
+// ============================================
+// Store
+// ============================================
+
+export const useAchievementStore = create<AchievementStore>((set, get) => ({
+    ...initialState,
 
     fetchAchievements: async () => {
         try {
@@ -22,6 +49,7 @@ export const useAchievementStore = create<AchievementStore>((set, get) => ({
             set({ achievements })
         } catch (e) {
             console.error('fetchAchievements error:', e)
+            set({ achievements: [] })
         }
     },
 
@@ -35,29 +63,23 @@ export const useAchievementStore = create<AchievementStore>((set, get) => ({
             if (!achievement) return null
 
             // Update progress
+            const newProgress = Math.min(currentValue, achievement.target)
             await window.electronAPI.dbRun(
                 'UPDATE achievements SET progress = ? WHERE type = ?',
-                [Math.min(currentValue, achievement.target), type]
+                [newProgress, type]
             )
 
             // Check if target reached
             if (currentValue >= achievement.target) {
                 const now = new Date().toISOString()
+
                 await window.electronAPI.dbRun(
                     'UPDATE achievements SET unlocked_at = ?, progress = ? WHERE type = ?',
                     [now, achievement.target, type]
                 )
 
                 // Award XP
-                const xpResult = await window.electronAPI.dbGet<{ value: string }>(
-                    'SELECT value FROM settings WHERE key = ?',
-                    ['total_xp']
-                )
-                const currentXP = parseInt(xpResult?.value || '0')
-                await window.electronAPI.dbRun(
-                    'UPDATE settings SET value = ? WHERE key = ?',
-                    [(currentXP + achievement.xp_reward).toString(), 'total_xp']
-                )
+                await awardAchievementXP(achievement.xp_reward)
 
                 const unlockedAchievement = { ...achievement, unlocked_at: now }
                 set({ unlockedRecently: unlockedAchievement })
@@ -73,36 +95,77 @@ export const useAchievementStore = create<AchievementStore>((set, get) => ({
         }
     },
 
-    clearRecentUnlock: () => set({ unlockedRecently: null })
+    clearRecentUnlock: () => set({ unlockedRecently: null }),
 }))
 
-// Achievement check helpers
-export async function checkWordAchievements(totalWords: number) {
-    const store = useAchievementStore.getState()
+// ============================================
+// Helper Functions
+// ============================================
 
-    if (totalWords >= 1) await store.checkAndUnlock('first_word', 1)
-    if (totalWords >= 10) await store.checkAndUnlock('words_10', totalWords)
-    if (totalWords >= 50) await store.checkAndUnlock('words_50', totalWords)
-    if (totalWords >= 100) await store.checkAndUnlock('words_100', totalWords)
-    if (totalWords >= 500) await store.checkAndUnlock('words_500', totalWords)
+async function awardAchievementXP(xpReward: number): Promise<void> {
+    const xpResult = await window.electronAPI.dbGet<{ value: string }>(
+        'SELECT value FROM settings WHERE key = ?',
+        [DB.SETTINGS_KEYS.TOTAL_XP]
+    )
+    const currentXP = parseInt(xpResult?.value ?? '0')
+
+    await window.electronAPI.dbRun(
+        'UPDATE settings SET value = ? WHERE key = ?',
+        [(currentXP + xpReward).toString(), DB.SETTINGS_KEYS.TOTAL_XP]
+    )
 }
 
-export async function checkStreakAchievements(streak: number) {
-    const store = useAchievementStore.getState()
+// ============================================
+// Achievement Check Helpers
+// ============================================
 
-    if (streak >= 3) await store.checkAndUnlock('streak_3', streak)
-    if (streak >= 7) await store.checkAndUnlock('streak_7', streak)
-    if (streak >= 30) await store.checkAndUnlock('streak_30', streak)
+export async function checkWordAchievements(totalWords: number): Promise<void> {
+    const store = useAchievementStore.getState()
+    const thresholds = [
+        { count: 1, type: 'first_word' },
+        { count: 10, type: 'words_10' },
+        { count: 50, type: 'words_50' },
+        { count: 100, type: 'words_100' },
+        { count: 500, type: 'words_500' },
+    ]
+
+    for (const { count, type } of thresholds) {
+        if (totalWords >= count) {
+            await store.checkAndUnlock(type, totalWords)
+        }
+    }
 }
 
-export async function checkMasteredAchievements(masteredCount: number) {
+export async function checkStreakAchievements(streak: number): Promise<void> {
     const store = useAchievementStore.getState()
+    const thresholds = [
+        { count: 3, type: 'streak_3' },
+        { count: 7, type: 'streak_7' },
+        { count: 30, type: 'streak_30' },
+    ]
 
-    if (masteredCount >= 10) await store.checkAndUnlock('mastered_10', masteredCount)
-    if (masteredCount >= 50) await store.checkAndUnlock('mastered_50', masteredCount)
+    for (const { count, type } of thresholds) {
+        if (streak >= count) {
+            await store.checkAndUnlock(type, streak)
+        }
+    }
 }
 
-export async function checkSpecialAchievements(type: 'perfect_quiz' | 'speed_demon' | 'night_owl' | 'early_bird') {
+export async function checkMasteredAchievements(masteredCount: number): Promise<void> {
+    const store = useAchievementStore.getState()
+    const thresholds = [
+        { count: 10, type: 'mastered_10' },
+        { count: 50, type: 'mastered_50' },
+    ]
+
+    for (const { count, type } of thresholds) {
+        if (masteredCount >= count) {
+            await store.checkAndUnlock(type, masteredCount)
+        }
+    }
+}
+
+export async function checkSpecialAchievements(type: SpecialAchievementType): Promise<void> {
     const store = useAchievementStore.getState()
     await store.checkAndUnlock(type, 1)
 }

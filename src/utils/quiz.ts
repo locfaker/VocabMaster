@@ -1,14 +1,22 @@
-import type { WordWithProgress, QuizQuestion, TypingChallenge } from '@/types'
+// ============================================
+// Quiz & Typing Utilities
+// ============================================
 
-// Generate quiz questions with 4 options
+import type { WordWithProgress } from '@/types'
+import type { QuizQuestion, TypingChallenge, TypingResult } from '@/types/learning'
+import { LEARNING } from '@/constants'
+
+/**
+ * Generate quiz questions with multiple choice options
+ */
 export function generateQuizQuestions(
     words: WordWithProgress[],
     allWords: WordWithProgress[],
-    count: number = 10,
+    count = LEARNING.DEFAULT_QUIZ_COUNT,
     type: 'definition' | 'term' | 'mixed' = 'mixed'
 ): QuizQuestion[] {
     const questions: QuizQuestion[] = []
-    const shuffledWords = [...words].sort(() => Math.random() - 0.5).slice(0, count)
+    const shuffledWords = shuffleArray(words).slice(0, count)
 
     for (const word of shuffledWords) {
         const questionType = type === 'mixed'
@@ -17,57 +25,55 @@ export function generateQuizQuestions(
 
         // Get wrong options from other words
         const otherWords = allWords.filter(w => w.id !== word.id)
-        const wrongOptions = otherWords
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 3)
+        const wrongOptions = shuffleArray(otherWords)
+            .slice(0, LEARNING.QUIZ_OPTIONS_COUNT - 1)
             .map(w => questionType === 'definition' ? w.definition : w.term)
 
         const correctAnswer = questionType === 'definition' ? word.definition : word.term
 
-        // Shuffle options
-        const allOptions = [...wrongOptions, correctAnswer].sort(() => Math.random() - 0.5)
+        // Shuffle all options
+        const allOptions = shuffleArray([...wrongOptions, correctAnswer])
         const correctIndex = allOptions.indexOf(correctAnswer)
 
         questions.push({
             word,
             options: allOptions,
             correctIndex,
-            type: questionType
+            type: questionType,
         })
     }
 
     return questions
 }
 
-// Generate typing challenges
+/**
+ * Generate typing challenges
+ */
 export function generateTypingChallenges(
     words: WordWithProgress[],
-    count: number = 10
+    count = LEARNING.DEFAULT_QUIZ_COUNT
 ): TypingChallenge[] {
-    const shuffledWords = [...words].sort(() => Math.random() - 0.5).slice(0, count)
-
-    return shuffledWords.map(word => ({
-        word,
-        hint: word.definition,
-        maskedWord: maskWord(word.term)
-    }))
+    return shuffleArray(words)
+        .slice(0, count)
+        .map(word => ({
+            word,
+            hint: word.definition,
+            maskedWord: maskWord(word.term),
+        }))
 }
 
-// Mask word for typing hint (show first and last letter)
+/**
+ * Mask word for typing hint (show first and last letter)
+ */
 function maskWord(word: string): string {
     if (word.length <= 2) return '_'.repeat(word.length)
-    const first = word[0]
-    const last = word[word.length - 1]
-    const middle = '_'.repeat(word.length - 2)
-    return `${first}${middle}${last}`
+    return `${word[0]}${'_'.repeat(word.length - 2)}${word[word.length - 1]}`
 }
 
-// Check typing answer with fuzzy matching
-export function checkTypingAnswer(input: string, correct: string): {
-    isCorrect: boolean
-    similarity: number
-    feedback: string
-} {
+/**
+ * Check typing answer with fuzzy matching
+ */
+export function checkTypingAnswer(input: string, correct: string): TypingResult {
     const normalizedInput = input.toLowerCase().trim()
     const normalizedCorrect = correct.toLowerCase().trim()
 
@@ -75,24 +81,28 @@ export function checkTypingAnswer(input: string, correct: string): {
         return { isCorrect: true, similarity: 100, feedback: 'Chính xác!' }
     }
 
-    // Calculate Levenshtein distance for similarity
     const similarity = calculateSimilarity(normalizedInput, normalizedCorrect)
 
-    if (similarity >= 90) {
+    if (similarity >= LEARNING.TYPING_SIMILARITY_THRESHOLD) {
         return { isCorrect: true, similarity, feedback: 'Gần đúng! (có lỗi chính tả nhỏ)' }
-    } else if (similarity >= 70) {
-        return { isCorrect: false, similarity, feedback: 'Gần đúng rồi, thử lại!' }
-    } else {
-        return { isCorrect: false, similarity, feedback: `Sai rồi. Đáp án: ${correct}` }
     }
+
+    if (similarity >= LEARNING.TYPING_CLOSE_THRESHOLD) {
+        return { isCorrect: false, similarity, feedback: 'Gần đúng rồi, thử lại!' }
+    }
+
+    return { isCorrect: false, similarity, feedback: `Sai rồi. Đáp án: ${correct}` }
 }
 
-// Levenshtein distance based similarity
+/**
+ * Calculate string similarity using Levenshtein distance
+ */
 function calculateSimilarity(str1: string, str2: string): number {
     const len1 = str1.length
     const len2 = str2.length
     const matrix: number[][] = []
 
+    // Initialize matrix
     for (let i = 0; i <= len1; i++) {
         matrix[i] = [i]
     }
@@ -100,13 +110,14 @@ function calculateSimilarity(str1: string, str2: string): number {
         matrix[0][j] = j
     }
 
+    // Fill matrix
     for (let i = 1; i <= len1; i++) {
         for (let j = 1; j <= len2; j++) {
             const cost = str1[i - 1] === str2[j - 1] ? 0 : 1
             matrix[i][j] = Math.min(
-                matrix[i - 1][j] + 1,
-                matrix[i][j - 1] + 1,
-                matrix[i - 1][j - 1] + cost
+                matrix[i - 1][j] + 1,      // deletion
+                matrix[i][j - 1] + 1,      // insertion
+                matrix[i - 1][j - 1] + cost // substitution
             )
         }
     }
@@ -116,18 +127,22 @@ function calculateSimilarity(str1: string, str2: string): number {
     return Math.round((1 - distance / maxLen) * 100)
 }
 
-// Generate listening challenge
-export function speakWord(text: string, rate: number = 1): void {
-    if ('speechSynthesis' in window) {
-        speechSynthesis.cancel()
-        const utterance = new SpeechSynthesisUtterance(text)
-        utterance.lang = 'en-US'
-        utterance.rate = rate
-        speechSynthesis.speak(utterance)
-    }
+/**
+ * Speak word using Web Speech API
+ */
+export function speakWord(text: string, rate = 1): void {
+    if (!('speechSynthesis' in window)) return
+
+    speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'en-US'
+    utterance.rate = rate
+    speechSynthesis.speak(utterance)
 }
 
-// Shuffle array helper
+/**
+ * Shuffle array using Fisher-Yates algorithm
+ */
 export function shuffleArray<T>(array: T[]): T[] {
     const shuffled = [...array]
     for (let i = shuffled.length - 1; i > 0; i--) {
