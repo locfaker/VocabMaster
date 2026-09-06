@@ -38,25 +38,139 @@ const softwareEngineeringVideos: CuratedVideo[] = offlineSeMetadata.map((meta: a
     title: meta.title,
     channel: meta.channel,
     thumbnailUrl: `https://img.youtube.com/vi/${meta.videoId}/hqdefault.jpg`,
-    durationFormatted: '10:00', // Mock duration,
+    durationFormatted: meta.durationFormatted || '02:30',
     description: meta.description,
     tags: meta.tags,
   },
   sampleCues: [], // Dữ liệu sẽ được fallback động từ offline_transcripts.json
-  quiz: []
+  quiz: [],
 }))
 
 export const IT_AI_LEARNING_FLOWS: LearningFlow[] = [
   {
     id: 'se-mastery',
-    title: 'Software Engineering Mastery',
-    subtitle: '100 Core IT Videos for Developers',
-    description: 'Tuyển tập các khái niệm cốt lõi nhất về System Design, Kiến trúc, Backend, và DevOps.',
+    title: 'Software Engineering Core (53 Video Tuyển Chọn)',
+    subtitle: 'Full Stack & System Design Video Series',
+    description:
+      'Tuyển tập 53 video YouTube gốc từ ByteByteGo, Fireship, Nana với phụ đề song ngữ và audio phát âm chuẩn từng giây.',
     icon: '💻',
     level: 'B1 - Trung cấp',
-    estimatedHours: '10 giờ',
+    estimatedHours: '8 giờ',
     category: 'code',
     videos: softwareEngineeringVideos,
+  },
+  {
+    id: 'se-system-design',
+    title: 'System Design & Kiến Trúc Phân Tán',
+    subtitle: 'Luyện kiến trúc cùng ByteByteGo & Hussein Nasser',
+    description:
+      'Làm chủ Rate Limiter, Consistent Hashing, TinyURL, Kafka, Redis, Microservices và OAuth 2.0.',
+    icon: '🏛️',
+    level: 'B2 - Khá',
+    estimatedHours: '2 giờ',
+    category: 'code',
+    videos: softwareEngineeringVideos.filter((v) =>
+      [
+        'YXkOdWBwqaA',
+        'uvb00oaa3k8',
+        'G1rOthIU-uo',
+        'SqcXvc3ZmRU',
+        'UF9Iqmg94tk',
+        'qSJAvd5Mgio',
+        'ZV5yTm4pT8g',
+      ].includes(v.info.videoId),
+    ),
+  },
+  {
+    id: 'se-devops',
+    title: 'DevOps, Containers & Điện Toán Đám Mây',
+    subtitle: 'Docker, Kubernetes, AWS, Terraform & CI/CD Pipelines',
+    description:
+      'Trọn bộ kỹ năng hạ tầng hiện đại: Đóng gói Container, điều phối K8s, máy chủ Nginx, Linux kernel và tự động hóa CI/CD.',
+    icon: '🐳',
+    level: 'B1 - Trung cấp',
+    estimatedHours: '2.5 giờ',
+    category: 'code',
+    videos: softwareEngineeringVideos.filter((v) =>
+      [
+        'pg19Z8LL06w',
+        'Gjnup-PuquQ',
+        'PziYflu8cB8',
+        'X48VuDVv0do',
+        'JKxlsvZXG7c',
+        'rrB13utjYV4',
+        'tomUWcQ0P3k',
+        'scEDHsr3APg',
+        'ZzI9JE0i6Lc',
+      ].includes(v.info.videoId),
+    ),
+  },
+  {
+    id: 'se-database',
+    title: 'Database Engineering & Lưu Trữ Dữ Liệu',
+    subtitle: 'SQL, PostgreSQL, Indexing B-Tree, MongoDB & Elasticsearch',
+    description:
+      'Hiểu sâu bản chất cơ sở dữ liệu quan hệ và phi quan hệ: Tối ưu truy vấn, đánh chỉ mục và tìm kiếm toàn văn.',
+    icon: '🗄️',
+    level: 'B1 - Trung cấp',
+    estimatedHours: '1.5 giờ',
+    category: 'code',
+    videos: softwareEngineeringVideos.filter((v) =>
+      [
+        'zsjvFFKOm3c',
+        'n2Fluyr3lbc',
+        '-qNSXK7s7_w',
+        '-bt_y4Loofg',
+        'zBZgdTb-dns',
+        'tzq4asJegKY',
+      ].includes(v.info.videoId),
+    ),
+  },
+  {
+    id: 'se-backend',
+    title: 'Backend Engineering & Runtimes',
+    subtitle: 'RESTful API, GraphQL, RabbitMQ, Node.js, Deno & Bun',
+    description:
+      'Kiến trúc backend hiện đại: Thiết kế API chuẩn, hệ thống hàng đợi tin cậy và so sánh các runtime JavaScript/TypeScript.',
+    icon: '⚡',
+    level: 'B1 - Trung cấp',
+    estimatedHours: '1.5 giờ',
+    category: 'code',
+    videos: softwareEngineeringVideos.filter((v) =>
+      [
+        '-MTSQjw5DrM',
+        'eIQh02xuVw4',
+        'NQ3fZtyXji0',
+        'UVR9lhUGAyU',
+        'ENrzD9HAZK4',
+        'F0G9lZ7gecE',
+        'M4TufsFlv_o',
+      ].includes(v.info.videoId),
+    ),
+  },
+  {
+    id: 'se-languages',
+    title: 'Ngôn Ngữ Lập Trình Cốt Lõi',
+    subtitle: 'Rust, Go, Python, JavaScript, C++, Java, Kotlin, Swift & Flutter',
+    description:
+      'So sánh triết lý và kiến trúc thiết kế của các ngôn ngữ lập trình phổ biến nhất thế giới hiện nay.',
+    icon: '🚀',
+    level: 'B1 - Trung cấp',
+    estimatedHours: '2 giờ',
+    category: 'code',
+    videos: softwareEngineeringVideos.filter((v) =>
+      [
+        '5C_HPTJg5ek',
+        '446E-r0rXHI',
+        'x7X9w_GIm1s',
+        'DHjqpvDnNGE',
+        'MNeX4EGtR5Y',
+        'l9AzO1FMgM8',
+        'xT8oP0wy-A0',
+        'nAchMctX4YA',
+        'lHhRhPV--G0',
+      ].includes(v.info.videoId),
+    ),
   },
   {
     id: 'flow-fs-frontend',

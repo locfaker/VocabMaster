@@ -1,31 +1,29 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
 
 test('Android Offline Fallback renders SE video correctly', async ({ page }) => {
-  // 1. Chặn request ra internet để ép lỗi Invidious
+  // Chặn internet để giả lập offline 100%
   await page.route('**/*', (route) => {
-    const url = route.request().url();
+    const url = route.request().url()
     if (url.includes('localhost') || url.includes('127.0.0.1')) {
-      route.continue();
+      route.continue()
     } else {
-      route.abort(); 
+      route.abort()
     }
-  });
+  })
 
-  // 2. Ép mode Web/Android (ko có electron)
   await page.addInitScript(() => {
-    window.electronAPI = undefined; 
-  });
+    window.electronAPI = undefined // Mock Android mode
+  })
 
-  // 3. Truy cập thẳng video (Hash Router)
-  await page.goto('http://localhost:5173/#/video/fu4p96ca5H4', { waitUntil: 'networkidle' });
-  
-  // 4. Chờ cue item render (fake data)
-  await page.waitForSelector('.border.transition-all', { timeout: 15000 });
-  await page.waitForTimeout(2000); // render UI đầy đủ
+  // Vào thẳng Video System Design Rate Limiting bằng route chuẩn
+  await page.goto('http://localhost:4173/#/video-learning?v=YXkOdWBwqaA', {
+    waitUntil: 'networkidle',
+  })
 
-  // 5. Chụp ảnh minh chứng
-  await page.screenshot({ path: 'offline-se-video-evidence.png' });
+  // Chờ transcript load offline
+  await page.waitForSelector('.border.transition-all', { timeout: 15000 })
+  await page.waitForTimeout(1000)
 
-  const cues = await page.$$('.border.transition-all');
-  expect(cues.length).toBeGreaterThan(0);
-});
+  await page.screenshot({ path: 'offline-se-video-evidence.png' })
+  console.log('Screenshot saved!')
+})

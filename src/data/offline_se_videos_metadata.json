@@ -1,142 +1,532 @@
 [
   {
-    "videoId": "fu4p96ca5H4",
-    "title": "System Design: Rate Limiting",
+    "videoId": "YXkOdWBwqaA",
+    "title": "Rate Limiter System Design: Token Bucket, Leaky Bucket, Scaling",
     "channel": "ByteByteGo",
-    "description": "Tìm hiểu cách thiết kế hệ thống giới hạn truy cập (Rate Limiting) trong các hệ thống phân tán lớn.",
-    "tags": ["System Design", "Backend", "Architecture"]
+    "category": "System Design",
+    "durationFormatted": "10:20",
+    "sentenceCount": 111,
+    "description": "Tìm hiểu chi tiết các thuật toán giới hạn tần suất yêu cầu: Token Bucket, Leaky Bucket và cách mở rộng quy mô.",
+    "tags": ["System Design", "Rate Limiting", "Backend", "Architecture"]
   },
   {
-    "videoId": "3c-iBn73dVU",
-    "title": "Docker Crash Course for Absolute Beginners",
-    "channel": "TechWorld with Nana",
-    "description": "Khóa học nhanh về Docker, containerization và cách triển khai ứng dụng cho người mới bắt đầu.",
-    "tags": ["DevOps", "Docker", "Containers"]
-  },
-  {
-    "videoId": "Tn6-PIqc4UM",
-    "title": "React in 100 Seconds",
-    "channel": "Fireship",
-    "description": "Tổng quan siêu tốc về thư viện UI phổ biến nhất thế giới: React.js.",
-    "tags": ["Frontend", "React", "JavaScript"]
-  },
-  {
-    "videoId": "5C_HPTJg5ek",
-    "title": "Rust in 100 Seconds",
-    "channel": "Fireship",
-    "description": "Ngôn ngữ lập trình Rust, an toàn bộ nhớ và hiệu năng cao được giải thích trong 100 giây.",
-    "tags": ["Rust", "Systems Programming"]
-  },
-  {
-    "videoId": "zsjvFFKOm3c",
-    "title": "SQL Explained in 100 Seconds",
-    "channel": "Fireship",
-    "description": "Cơ sở dữ liệu quan hệ và ngôn ngữ truy vấn SQL.",
-    "tags": ["Database", "SQL", "Backend"]
-  },
-  {
-    "videoId": "Gjnup-PuquQ",
-    "title": "Docker in 100 Seconds",
-    "channel": "Fireship",
-    "description": "Khái niệm cốt lõi của Docker và Containers.",
-    "tags": ["DevOps", "Docker"]
-  },
-  {
-    "videoId": "hwP7WQkmECE",
-    "title": "Git in 100 Seconds",
-    "channel": "Fireship",
-    "description": "Hệ thống quản lý phiên bản Git và cách hoạt động của nó.",
-    "tags": ["Git", "Version Control", "Tools"]
-  },
-  {
-    "videoId": "eIQh02xuVw4",
-    "title": "GraphQL in 100 Seconds",
-    "channel": "Fireship",
-    "description": "Ngôn ngữ truy vấn dữ liệu thay thế REST API mạnh mẽ.",
-    "tags": ["API", "GraphQL", "Backend"]
-  },
-  {
-    "videoId": "zQnBQ4tB3ZA",
-    "title": "TypeScript in 100 Seconds",
-    "channel": "Fireship",
-    "description": "TypeScript - JavaScript siêu tập với hệ thống kiểu tĩnh.",
-    "tags": ["TypeScript", "JavaScript", "Frontend"]
-  },
-  {
-    "videoId": "PziYfluKjFc",
-    "title": "Kubernetes in 100 Seconds",
-    "channel": "Fireship",
-    "description": "Hệ thống điều phối Container mạnh mẽ nhất thế giới - K8s.",
-    "tags": ["DevOps", "Kubernetes", "Cloud"]
-  },
-  {
-    "videoId": "-mN3VyJuCjM",
-    "title": "REST API Concepts and Examples",
-    "channel": "Fireship",
-    "description": "Thiết kế RESTful API tiêu chuẩn cho các ứng dụng web.",
-    "tags": ["API", "REST", "Backend"]
-  },
-  {
-    "videoId": "CpbTejMWGvU",
-    "title": "Microservices in 100 Seconds",
-    "channel": "Fireship",
-    "description": "Kiến trúc vi dịch vụ so với kiến trúc nguyên khối (Monolith).",
-    "tags": ["Architecture", "Microservices", "Backend"]
-  },
-  {
-    "videoId": "Ch5VhJzaoaI",
+    "videoId": "uvb00oaa3k8",
     "title": "Kafka in 100 Seconds",
     "channel": "Fireship",
-    "description": "Hệ thống truyền tải sự kiện phân tán Apache Kafka.",
-    "tags": ["Data", "Kafka", "Backend"]
+    "category": "System Design",
+    "durationFormatted": "02:18",
+    "sentenceCount": 21,
+    "description": "Kiến trúc hàng đợi phân tán và xử lý dòng dữ liệu lớn với Apache Kafka.",
+    "tags": ["Kafka", "Event-Driven", "Message Queue", "Backend"]
   },
   {
     "videoId": "G1rOthIU-uo",
     "title": "Redis in 100 Seconds",
     "channel": "Fireship",
-    "description": "Cơ sở dữ liệu In-memory siêu tốc Redis dùng làm Cache.",
-    "tags": ["Database", "Redis", "Cache"]
+    "category": "System Design",
+    "durationFormatted": "02:24",
+    "sentenceCount": 21,
+    "description": "Cơ sở dữ liệu In-Memory Redis: Lưu trữ Key-Value, Caching và Pub/Sub.",
+    "tags": ["Redis", "Caching", "In-Memory", "Database"]
+  },
+  {
+    "videoId": "SqcXvc3ZmRU",
+    "title": "Microservices vs Monolith Architecture - Trade-Offs",
+    "channel": "Hussein Nasser",
+    "category": "System Design",
+    "durationFormatted": "16:45",
+    "sentenceCount": 79,
+    "description": "Phân tích ưu nhược điểm và sự đánh đổi giữa kiến trúc Microservices và Monolith.",
+    "tags": ["Microservices", "Monolith", "Architecture", "System Design"]
+  },
+  {
+    "videoId": "UF9Iqmg94tk",
+    "title": "Consistent Hashing | Algorithms You Should Know",
+    "channel": "ByteByteGo",
+    "category": "System Design",
+    "durationFormatted": "08:12",
+    "sentenceCount": 51,
+    "description": "Thuật toán băm nhất quán giải quyết bài toán phân phối tải và mở rộng bộ nhớ đệm phân tán.",
+    "tags": ["Consistent Hashing", "Distributed Systems", "Algorithms", "System Design"]
+  },
+  {
+    "videoId": "qSJAvd5Mgio",
+    "title": "Design a URL Shortener (TinyURL) - System Design Interview",
+    "channel": "ByteByteGo",
+    "category": "System Design",
+    "durationFormatted": "12:35",
+    "sentenceCount": 712,
+    "description": "Thiết kế hệ thống rút gọn liên kết: cơ chế tạo khóa, phân vùng cơ sở dữ liệu và chuyển hướng 301 vs 302.",
+    "tags": ["System Design", "TinyURL", "Interview", "Scalability"]
+  },
+  {
+    "videoId": "ZV5yTm4pT8g",
+    "title": "OAuth 2.0 Explained In Simple Terms",
+    "channel": "ByteByteGo",
+    "category": "System Design",
+    "durationFormatted": "06:40",
+    "sentenceCount": 28,
+    "description": "Hiểu rõ cơ chế ủy quyền OAuth 2.0, Access Token, Refresh Token và các luồng cấp quyền Authorization Code Flow.",
+    "tags": ["OAuth 2.0", "Security", "Authentication", "Authorization"]
+  },
+  {
+    "videoId": "pg19Z8LL06w",
+    "title": "Docker Crash Course for Absolute Beginners",
+    "channel": "TechWorld with Nana",
+    "category": "DevOps",
+    "durationFormatted": "45:30",
+    "sentenceCount": 444,
+    "description": "Khóa học thực chiến về Docker, Containerization và cách triển khai ứng dụng trên máy chủ.",
+    "tags": ["Docker", "Containers", "DevOps", "Beginner"]
+  },
+  {
+    "videoId": "Gjnup-PuquQ",
+    "title": "Docker in 100 Seconds",
+    "channel": "Fireship",
+    "category": "DevOps",
+    "durationFormatted": "02:15",
+    "sentenceCount": 20,
+    "description": "Khái niệm đóng gói ứng dụng trong Docker Container và Images.",
+    "tags": ["Docker", "Containers", "DevOps", "Cloud"]
+  },
+  {
+    "videoId": "PziYflu8cB8",
+    "title": "Kubernetes Explained in 100 Seconds",
+    "channel": "Fireship",
+    "category": "DevOps",
+    "durationFormatted": "02:22",
+    "sentenceCount": 20,
+    "description": "Hệ thống điều phối Container tự động hóa Kubernetes: Pods, Services, Deployments.",
+    "tags": ["Kubernetes", "K8s", "DevOps", "Containers"]
+  },
+  {
+    "videoId": "X48VuDVv0do",
+    "title": "Kubernetes Architecture: Pods, Deployments & Ingress",
+    "channel": "TechWorld with Nana",
+    "category": "DevOps",
+    "durationFormatted": "58:40",
+    "sentenceCount": 1392,
+    "description": "Kiến trúc chuyên sâu về Kubernetes Cluster, Worker Nodes, Control Plane và Ingress Controller.",
+    "tags": ["Kubernetes", "Architecture", "Cloud", "DevOps"]
   },
   {
     "videoId": "JKxlsvZXG7c",
     "title": "Nginx in 100 Seconds",
     "channel": "Fireship",
-    "description": "Web server và Reverse Proxy Nginx.",
-    "tags": ["DevOps", "Nginx", "Server"]
+    "category": "DevOps",
+    "durationFormatted": "02:14",
+    "sentenceCount": 20,
+    "description": "Máy chủ web hiệu năng cao Nginx và cơ chế Reverse Proxy, Cân bằng tải.",
+    "tags": ["Nginx", "Reverse Proxy", "Web Server", "Load Balancing"]
   },
   {
     "videoId": "rrB13utjYV4",
     "title": "Linux in 100 Seconds",
     "channel": "Fireship",
-    "description": "Hệ điều hành mã nguồn mở mạnh mẽ nhất thống trị máy chủ.",
-    "tags": ["Linux", "OS", "DevOps"]
+    "category": "DevOps",
+    "durationFormatted": "02:29",
+    "sentenceCount": 24,
+    "description": "Hệ điều hành nguồn mở thống trị toàn bộ hạ tầng máy chủ và đám mây.",
+    "tags": ["Linux", "Operating Systems", "Kernel", "Shell"]
   },
   {
-    "videoId": "pWbOclCGrmA",
-    "title": "Clean Code - Uncle Bob",
-    "channel": "Unity Coin",
-    "description": "Robert C. Martin giải thích về nghệ thuật viết mã sạch (Clean Code).",
-    "tags": ["Clean Code", "Engineering Practices"]
+    "videoId": "tomUWcQ0P3k",
+    "title": "Terraform in 100 Seconds",
+    "channel": "Fireship",
+    "category": "DevOps",
+    "durationFormatted": "02:26",
+    "sentenceCount": 20,
+    "description": "Quản lý hạ tầng dưới dạng mã nguồn (Infrastructure as Code) đa đám mây với Terraform.",
+    "tags": ["Terraform", "IaC", "DevOps", "Cloud"]
   },
   {
-    "videoId": "bkb1xQ4l8t8",
-    "title": "OAuth 2.0 and OpenID Connect",
-    "channel": "OktaDev",
-    "description": "Giải thích chi tiết về luồng xác thực OAuth 2.0 và OIDC.",
-    "tags": ["Security", "Authentication", "Backend"]
+    "videoId": "scEDHsr3APg",
+    "title": "DevOps CI/CD Explained in 100 Seconds",
+    "channel": "Fireship",
+    "category": "DevOps",
+    "durationFormatted": "02:10",
+    "sentenceCount": 18,
+    "description": "Quy trình tích hợp liên tục và phân phối liên tục (Continuous Integration & Delivery).",
+    "tags": ["DevOps", "CI/CD", "Automation", "Pipelines"]
   },
   {
-    "videoId": "yosg9Bzi_v8",
-    "title": "What is a Message Queue?",
-    "channel": "ByteByteGo",
-    "description": "Tìm hiểu về Hàng đợi thông điệp (Message Queue) trong kiến trúc phân tán.",
-    "tags": ["System Design", "Backend"]
+    "videoId": "ZzI9JE0i6Lc",
+    "title": "AWS Cloud Explained in 100 Seconds",
+    "channel": "Fireship",
+    "category": "DevOps",
+    "durationFormatted": "02:35",
+    "sentenceCount": 25,
+    "description": "Hệ sinh thái điện toán đám mây Amazon Web Services: EC2, S3, Lambda và IAM.",
+    "tags": ["AWS", "Cloud", "Infrastructure", "DevOps"]
   },
   {
-    "videoId": "v4m-K-XwA1A",
-    "title": "What is WebRTC?",
+    "videoId": "zsjvFFKOm3c",
+    "title": "SQL Explained in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Database",
+    "durationFormatted": "02:25",
+    "sentenceCount": 20,
+    "description": "Ngôn ngữ truy vấn có cấu trúc SQL và các nguyên lý cơ sở dữ liệu quan hệ.",
+    "tags": ["SQL", "Database", "Relational", "RDBMS"]
+  },
+  {
+    "videoId": "n2Fluyr3lbc",
+    "title": "PostgreSQL in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Database",
+    "durationFormatted": "02:30",
+    "sentenceCount": 23,
+    "description": "Cơ sở dữ liệu quan hệ đối tượng tiên tiến nhất thế giới PostgreSQL.",
+    "tags": ["PostgreSQL", "Database", "SQL", "Open Source"]
+  },
+  {
+    "videoId": "-qNSXK7s7_w",
+    "title": "Database Indexing Explained (with PostgreSQL)",
     "channel": "Hussein Nasser",
-    "description": "Giao thức truyền thông thời gian thực WebRTC trên trình duyệt.",
-    "tags": ["Networking", "WebRTC", "Frontend"]
+    "category": "Database",
+    "durationFormatted": "24:18",
+    "sentenceCount": 138,
+    "description": "Cơ chế đánh chỉ mục B-Tree, tối ưu hóa truy vấn và phân tích EXPLAIN ANALYZE.",
+    "tags": ["PostgreSQL", "Indexing", "B-Tree", "Optimization"]
+  },
+  {
+    "videoId": "-bt_y4Loofg",
+    "title": "MongoDB in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Database",
+    "durationFormatted": "02:21",
+    "sentenceCount": 20,
+    "description": "Cơ sở dữ liệu NoSQL hướng tài liệu JSON hàng đầu MongoDB.",
+    "tags": ["MongoDB", "NoSQL", "Document Database", "JSON"]
+  },
+  {
+    "videoId": "zBZgdTb-dns",
+    "title": "Supabase in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Database",
+    "durationFormatted": "02:28",
+    "sentenceCount": 22,
+    "description": "Nền tảng mã nguồn mở thay thế Firebase dựa trên PostgreSQL với Auth, Realtime và Storage.",
+    "tags": ["Supabase", "PostgreSQL", "Backend as a Service", "BaaS"]
+  },
+  {
+    "videoId": "tzq4asJegKY",
+    "title": "Elasticsearch & Lucene Explained",
+    "channel": "Fireship",
+    "category": "Database",
+    "durationFormatted": "09:40",
+    "sentenceCount": 76,
+    "description": "Công cụ tìm kiếm toàn văn phân tán và phân tích log thời gian thực Elasticsearch.",
+    "tags": ["Elasticsearch", "Search Engine", "Lucene", "Full-Text Search"]
+  },
+  {
+    "videoId": "-MTSQjw5DrM",
+    "title": "RESTful APIs in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Backend",
+    "durationFormatted": "02:25",
+    "sentenceCount": 96,
+    "description": "Nguyên lý thiết kế RESTful API, HTTP Methods, Status Codes và Stateless Architecture.",
+    "tags": ["API", "REST", "HTTP", "Backend"]
+  },
+  {
+    "videoId": "eIQh02xuVw4",
+    "title": "GraphQL in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Backend",
+    "durationFormatted": "02:18",
+    "sentenceCount": 20,
+    "description": "Ngôn ngữ truy vấn dữ liệu linh hoạt thay thế REST của Meta.",
+    "tags": ["GraphQL", "API", "Backend", "Frontend"]
+  },
+  {
+    "videoId": "NQ3fZtyXji0",
+    "title": "RabbitMQ in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Backend",
+    "durationFormatted": "02:25",
+    "sentenceCount": 23,
+    "description": "Hệ thống truyền thông điệp tin cậy RabbitMQ với giao thức AMQP, Exchanges và Queues.",
+    "tags": ["RabbitMQ", "Message Broker", "AMQP", "Backend"]
+  },
+  {
+    "videoId": "UVR9lhUGAyU",
+    "title": "DNS Explained in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Backend",
+    "durationFormatted": "02:20",
+    "sentenceCount": 20,
+    "description": "Hệ thống phân giải tên miền DNS: A Record, CNAME, Nameservers và Root DNS.",
+    "tags": ["DNS", "Networking", "Internet", "Web Protocols"]
+  },
+  {
+    "videoId": "ENrzD9HAZK4",
+    "title": "Node.js Ultimate Beginner Guide",
+    "channel": "Fireship",
+    "category": "Backend",
+    "durationFormatted": "11:32",
+    "sentenceCount": 159,
+    "description": "Môi trường thực thi JavaScript phía máy chủ Node.js: Kiến trúc hướng sự kiện và Non-blocking I/O.",
+    "tags": ["Node.js", "JavaScript", "Event Loop", "Backend"]
+  },
+  {
+    "videoId": "F0G9lZ7gecE",
+    "title": "Deno in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Backend",
+    "durationFormatted": "02:20",
+    "sentenceCount": 20,
+    "description": "Môi trường runtime an toàn cho JavaScript & TypeScript của tác giả Ryan Dahl.",
+    "tags": ["Deno", "TypeScript", "JavaScript", "Backend"]
+  },
+  {
+    "videoId": "M4TufsFlv_o",
+    "title": "Bun in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Backend",
+    "durationFormatted": "02:18",
+    "sentenceCount": 37,
+    "description": "JavaScript runtime siêu tốc độ được viết bằng Zig, tích hợp sẵn package manager và bundler.",
+    "tags": ["Bun", "JavaScript", "Zig", "Performance"]
+  },
+  {
+    "videoId": "Tn6-PIqc4UM",
+    "title": "React in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Frontend",
+    "durationFormatted": "02:20",
+    "sentenceCount": 20,
+    "description": "Thư viện xây dựng giao diện người dùng dựa trên Component của Meta.",
+    "tags": ["React", "JavaScript", "Frontend", "UI"]
+  },
+  {
+    "videoId": "w7ejDZ8SWv8",
+    "title": "React 19 & Server Components: Full Architecture Walkthrough",
+    "channel": "Jack Herrington",
+    "category": "Frontend",
+    "durationFormatted": "13:10",
+    "sentenceCount": 886,
+    "description": "Khám phá kiến trúc React Server Components (RSC), Server Actions và tối ưu hóa render.",
+    "tags": ["React 19", "RSC", "Frontend", "Next.js"]
+  },
+  {
+    "videoId": "Sklc_fQBmcs",
+    "title": "Next.js in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Frontend",
+    "durationFormatted": "12:15",
+    "sentenceCount": 103,
+    "description": "Framework React fullstack hàng đầu: App Router, Server Side Rendering và Static Site Generation.",
+    "tags": ["Next.js", "React", "SSR", "Fullstack"]
+  },
+  {
+    "videoId": "zQnBQ4tB3ZA",
+    "title": "TypeScript in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Frontend",
+    "durationFormatted": "02:24",
+    "sentenceCount": 22,
+    "description": "JavaScript siêu tập bổ sung hệ thống kiểu tĩnh và an toàn mã nguồn.",
+    "tags": ["TypeScript", "JavaScript", "Static Types"]
+  },
+  {
+    "videoId": "KjY94sAKLlw",
+    "title": "TypeScript for Senior Engineers: Generics & Type Narrowing",
+    "channel": "Matt Pocock",
+    "category": "Frontend",
+    "durationFormatted": "18:45",
+    "sentenceCount": 1859,
+    "description": "Làm chủ TypeScript nâng cao: Generics, Type Narrowing, Template Literal Types.",
+    "tags": ["TypeScript", "Generics", "Senior", "Advanced"]
+  },
+  {
+    "videoId": "nhBVL41-_Cw",
+    "title": "Vue.js Explained in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Frontend",
+    "durationFormatted": "02:20",
+    "sentenceCount": 19,
+    "description": "Framework JavaScript tiến bộ với hệ thống phản ứng (Reactivity) thanh lịch.",
+    "tags": ["Vue.js", "Frontend", "Reactivity", "UI"]
+  },
+  {
+    "videoId": "rv3Yq-B8qp4",
+    "title": "Svelte in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Frontend",
+    "durationFormatted": "02:22",
+    "sentenceCount": 20,
+    "description": "Framework biên dịch giao diện người dùng không cần Virtual DOM.",
+    "tags": ["Svelte", "Compiler", "Frontend", "No Virtual DOM"]
+  },
+  {
+    "videoId": "mr15Xzb1Ook",
+    "title": "Tailwind CSS in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Frontend",
+    "durationFormatted": "02:18",
+    "sentenceCount": 19,
+    "description": "Framework CSS Utility-First giúp thiết kế giao diện cực nhanh ngay trong mã HTML.",
+    "tags": ["Tailwind", "CSS", "Styling", "UI"]
+  },
+  {
+    "videoId": "OEV8gMkCHXQ",
+    "title": "CSS in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Frontend",
+    "durationFormatted": "02:21",
+    "sentenceCount": 19,
+    "description": "Ngôn ngữ định dạng bảng kiểu hiển thị nội dung trên web: Flexbox, Grid và Animations.",
+    "tags": ["CSS", "Web Design", "Styles", "Frontend"]
+  },
+  {
+    "videoId": "ok-plXXHlWw",
+    "title": "HTML in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Frontend",
+    "durationFormatted": "02:26",
+    "sentenceCount": 21,
+    "description": "Khung xương của toàn bộ trang web: Thẻ ngữ nghĩa Semantic HTML, DOM và Web APIs.",
+    "tags": ["HTML", "Web", "DOM", "Frontend"]
+  },
+  {
+    "videoId": "cbB3QEwWMlA",
+    "title": "WebAssembly (WASM) in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Frontend",
+    "durationFormatted": "02:23",
+    "sentenceCount": 20,
+    "description": "Mã nhị phân bytecode chạy với tốc độ gần như bản địa (Near-Native) ngay trong trình duyệt.",
+    "tags": ["WebAssembly", "WASM", "C++", "Rust", "Web"]
+  },
+  {
+    "videoId": "5C_HPTJg5ek",
+    "title": "Rust in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Languages",
+    "durationFormatted": "02:28",
+    "sentenceCount": 21,
+    "description": "Ngôn ngữ lập trình hệ thống hiện đại, không dùng Garbage Collector, an toàn bộ nhớ tuyệt đối.",
+    "tags": ["Rust", "Systems Programming", "Memory Safety"]
+  },
+  {
+    "videoId": "446E-r0rXHI",
+    "title": "Go in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Languages",
+    "durationFormatted": "02:25",
+    "sentenceCount": 20,
+    "description": "Ngôn ngữ Go của Google với hiệu năng biên dịch cao và Goroutines xử lý đồng thời siêu nhẹ.",
+    "tags": ["Golang", "Go", "Backend", "Concurrency"]
+  },
+  {
+    "videoId": "x7X9w_GIm1s",
+    "title": "Python in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Languages",
+    "durationFormatted": "02:26",
+    "sentenceCount": 19,
+    "description": "Ngôn ngữ lập trình thông dịch linh hoạt, dẫn đầu làn sóng AI và Data Science.",
+    "tags": ["Python", "AI", "Data Science", "Backend"]
+  },
+  {
+    "videoId": "DHjqpvDnNGE",
+    "title": "JavaScript in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Languages",
+    "durationFormatted": "02:28",
+    "sentenceCount": 23,
+    "description": "Ngôn ngữ lập trình phổ biến nhất hành tinh vận hành toàn bộ thế giới Web.",
+    "tags": ["JavaScript", "Web", "Frontend", "Fullstack"]
+  },
+  {
+    "videoId": "MNeX4EGtR5Y",
+    "title": "C++ in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Languages",
+    "durationFormatted": "02:30",
+    "sentenceCount": 24,
+    "description": "Ngôn ngữ lập trình hệ thống hướng đối tượng tốc độ cực cao, nền tảng của Game Engines và OS.",
+    "tags": ["C++", "Systems Programming", "OOP", "High Performance"]
+  },
+  {
+    "videoId": "l9AzO1FMgM8",
+    "title": "Java in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Languages",
+    "durationFormatted": "02:24",
+    "sentenceCount": 20,
+    "description": "Ngôn ngữ doanh nghiệp kinh điển dựa trên máy ảo JVM: Viết một lần, chạy mọi nơi.",
+    "tags": ["Java", "JVM", "Enterprise", "Backend"]
+  },
+  {
+    "videoId": "xT8oP0wy-A0",
+    "title": "Kotlin in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Languages",
+    "durationFormatted": "02:22",
+    "sentenceCount": 20,
+    "description": "Ngôn ngữ hiện đại chạy trên JVM được Google chọn làm chuẩn phát triển ứng dụng Android.",
+    "tags": ["Kotlin", "Android", "JVM", "Mobile"]
+  },
+  {
+    "videoId": "nAchMctX4YA",
+    "title": "Swift in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Languages",
+    "durationFormatted": "02:25",
+    "sentenceCount": 20,
+    "description": "Ngôn ngữ lập trình an toàn và trực quan của Apple dành cho iOS, macOS và watchOS.",
+    "tags": ["Swift", "Apple", "iOS", "Mobile"]
+  },
+  {
+    "videoId": "lHhRhPV--G0",
+    "title": "Flutter in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Languages",
+    "durationFormatted": "02:22",
+    "sentenceCount": 20,
+    "description": "Bộ công cụ UI đa nền tảng của Google xây dựng ứng dụng Native cho Mobile, Web và Desktop từ một codebase.",
+    "tags": ["Flutter", "Dart", "Mobile", "Cross-Platform"]
+  },
+  {
+    "videoId": "hwP7WQkmECE",
+    "title": "Git in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Tools",
+    "durationFormatted": "02:20",
+    "sentenceCount": 20,
+    "description": "Hệ thống quản lý phiên bản phân tán Git: Commit, Branch, Merge và Directed Acyclic Graph.",
+    "tags": ["Git", "Version Control", "Collaboration"]
+  },
+  {
+    "videoId": "c4OyfL5o7DU",
+    "title": "Neovim in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Tools",
+    "durationFormatted": "02:21",
+    "sentenceCount": 20,
+    "description": "Trình biên tập văn bản dòng lệnh có khả năng mở rộng cực cao với ngôn ngữ Lua.",
+    "tags": ["Neovim", "Vim", "Editor", "Lua"]
+  },
+  {
+    "videoId": "-txKSRn0qeA",
+    "title": "Vim in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Tools",
+    "durationFormatted": "02:18",
+    "sentenceCount": 98,
+    "description": "Trình soạn thảo bàn phím huyền thoại trên Unix: Modal Editing (Normal, Insert, Visual).",
+    "tags": ["Vim", "CLI", "Terminal", "Productivity"]
+  },
+  {
+    "videoId": "I4EWvMFj37g",
+    "title": "Bash in 100 Seconds",
+    "channel": "Fireship",
+    "category": "Tools",
+    "durationFormatted": "02:28",
+    "sentenceCount": 23,
+    "description": "Ngôn ngữ kịch bản dòng lệnh Unix chuẩn Bourne Again SHell điều khiển hệ điều hành.",
+    "tags": ["Bash", "Shell", "CLI", "Linux"]
   }
 ]

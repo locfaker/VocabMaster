@@ -9059,6 +9059,24 @@ function parseXmlToCues(xmlText: string): TranscriptCue[] {
  * Dynamically fetch 100% full official transcript for ANY YouTube video
  */
 export async function fetchYouTubeBilingualTranscript(videoId: string): Promise<TranscriptCue[]> {
+  // 0. Fast-Path: Bundled Curated & Offline Database (0ms latency, zero network, 100% verified)
+  try {
+    const offlineDb = await import('../data/offline_transcripts.json')
+    if (offlineDb.default && (offlineDb.default as Record<string, TranscriptCue[]>)[videoId]) {
+      const cues = (offlineDb.default as Record<string, TranscriptCue[]>)[videoId]
+      if (Array.isArray(cues) && cues.length > 0) {
+        return cues
+      }
+    }
+  } catch (e) {
+    // Continue to fallback
+  }
+
+  const found = ALL_CURATED_LEARNING_VIDEOS.find((v) => v.info.videoId === videoId)
+  if (found && found.sampleCues && found.sampleCues.length > 5) {
+    return found.sampleCues
+  }
+
   // 1. Try Dynamic Native Electron IPC Extractor (works for ANY YouTube video on Desktop)
   if (
     typeof window !== 'undefined' &&
@@ -9171,16 +9189,16 @@ export async function fetchYouTubeBilingualTranscript(videoId: string): Promise<
   }
 
   // 5. Honest fallback: Try bundled curated data as absolute last resort
-  const found = ALL_CURATED_LEARNING_VIDEOS.find((v) => v.info.videoId === videoId)
-  if (found && found.sampleCues && found.sampleCues.length > 0) {
-    return found.sampleCues
+  const curatedFallback = ALL_CURATED_LEARNING_VIDEOS.find((v) => v.info.videoId === videoId)
+  if (curatedFallback && curatedFallback.sampleCues && curatedFallback.sampleCues.length > 0) {
+    return curatedFallback.sampleCues
   }
 
   // 6. Offline Big Database Fallback
   try {
     const offlineDb = await import('../data/offline_transcripts.json')
-    if (offlineDb.default && offlineDb.default[videoId]) {
-      return offlineDb.default[videoId]
+    if (offlineDb.default && (offlineDb.default as any)[videoId]) {
+      return (offlineDb.default as any)[videoId]
     }
   } catch (e) {
     // Offline DB chưa được build hoặc không có
@@ -9199,7 +9217,8 @@ export function parseSrtOrVttToCues(content: string): TranscriptCue[] {
   const cues: TranscriptCue[] = []
   let cueId = 1
 
-  const timeRegex = /(?:(\d{2,}):)?(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(?:(\d{2,}):)?(\d{2}):(\d{2})[,.](\d{3})/
+  const timeRegex =
+    /(?:(\d{2,}):)?(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(?:(\d{2,}):)?(\d{2}):(\d{2})[,.](\d{3})/
 
   const parseTime = (h: string | undefined, m: string, s: string, ms: string) => {
     const hours = h ? parseInt(h, 10) : 0
@@ -9249,4 +9268,3 @@ export function parseSrtOrVttToCues(content: string): TranscriptCue[] {
 
   return cues
 }
-

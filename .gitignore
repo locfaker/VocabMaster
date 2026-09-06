@@ -97,3 +97,8 @@ release/
 android/app/build/
 android/.gradle/
 android/build/
+
+# Temporary test & scratch
+scratch/
+test-results/
+*.png

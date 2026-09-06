@@ -3,6 +3,7 @@
 // ============================================
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   fetchYouTubeBilingualTranscript,
   TranscriptCue,
@@ -29,11 +30,13 @@ interface FlowContext {
 
 export const VideoLearning: React.FC = () => {
   const { fetchDecks } = useDeckStore()
+  const [searchParams] = useSearchParams()
+  const paramVideoId = searchParams.get('v') || searchParams.get('videoId')
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [activeFlow, setActiveFlow] = useState<FlowContext | null>(null)
-  const [currentVideoId, setCurrentVideoId] = useState<string | null>('UF8uR6Z6KLc') // Default to Steve Jobs
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(paramVideoId || 'UF8uR6Z6KLc')
   const [currentVideoInfo, setCurrentVideoInfo] = useState<VideoInfo | null>(
-    ALL_CURATED_LEARNING_VIDEOS[0].info,
+    ALL_CURATED_LEARNING_VIDEOS[0]?.info || null,
   )
   const [cues, setCues] = useState<TranscriptCue[]>([])
   const [loading, setLoading] = useState(false)
@@ -107,13 +110,12 @@ export const VideoLearning: React.FC = () => {
     }
   }
 
-  // Initial load default video transcript
+  // Initial load or when URL query parameter changes
   useEffect(() => {
-    if (cues.length === 0 && !loading && currentVideoId) {
-      handleLoadVideo(currentVideoId, currentVideoInfo || undefined)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    const targetVideoId = paramVideoId || currentVideoId || 'UF8uR6Z6KLc'
+    handleLoadVideo(targetVideoId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramVideoId])
 
   // Navigation callbacks
   const handlePrevSentence = useCallback(() => {

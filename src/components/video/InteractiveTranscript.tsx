@@ -1,10 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, memo } from 'react'
-import {
-  TranscriptCue,
-  translateEnToVi,
-} from '@/services/youtubeTranscriptService'
+import { TranscriptCue, translateEnToVi } from '@/services/youtubeTranscriptService'
 import { BookmarkPlus, Search, Volume2, Play } from 'lucide-react'
-import { speakWord } from '@/utils/quiz'
 
 interface InteractiveTranscriptProps {
   cues: TranscriptCue[]
@@ -50,20 +46,54 @@ const CueItem = memo<CueItemProps>(
       }
     }, [cue.textVi, isActive, cue.textEn, viTranslation])
 
+    const [isSpeaking, setIsSpeaking] = useState(false)
+
+    useEffect(() => {
+      return () => {
+        if (isSpeaking && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel()
+        }
+      }
+    }, [isSpeaking])
+
     const handleSpeakBilingual = () => {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+
+      if (isSpeaking) {
+        window.speechSynthesis.cancel()
+        setIsSpeaking(false)
+        return
+      }
+
       window.speechSynthesis.cancel() // Hủy giọng đang đọc nếu có
-      
-      // Đọc tiếng Anh
+      setIsSpeaking(true)
+
+      const targetVi = viTranslation || cue.textVi
+
+      // 1. Đọc tiếng Anh trước
       const enUtterance = new SpeechSynthesisUtterance(cue.textEn)
       enUtterance.lang = 'en-US'
-      window.speechSynthesis.speak(enUtterance)
-      
-      // Đọc tiếng Việt
-      if (viTranslation) {
-        const viUtterance = new SpeechSynthesisUtterance(viTranslation)
-        viUtterance.lang = 'vi-VN'
-        window.speechSynthesis.speak(viUtterance)
+      enUtterance.rate = 0.95
+
+      enUtterance.onend = () => {
+        // 2. Tiếng Anh kết thúc -> Tự động đọc tiếng Việt tiếp theo
+        if (targetVi && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          const viUtterance = new SpeechSynthesisUtterance(targetVi)
+          viUtterance.lang = 'vi-VN'
+          viUtterance.rate = 0.95
+          viUtterance.onend = () => setIsSpeaking(false)
+          viUtterance.onerror = () => setIsSpeaking(false)
+          window.speechSynthesis.speak(viUtterance)
+        } else {
+          setIsSpeaking(false)
+        }
       }
+
+      enUtterance.onerror = () => {
+        setIsSpeaking(false)
+      }
+
+      window.speechSynthesis.speak(enUtterance)
     }
 
     return (
@@ -90,16 +120,20 @@ const CueItem = memo<CueItemProps>(
               <span>{formatTimestamp(cue.start)}</span>
             </button>
 
-            {isActive && (
-              <button
-                onClick={handleSpeakBilingual}
-                className='flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 text-[11px] font-bold hover:bg-primary-200 transition-colors'
-                title='Phát âm câu này (EN ➔ VI)'
-              >
-                <Volume2 size={12} />
-                <span>Đọc song ngữ</span>
-              </button>
-            )}
+            <button
+              onClick={handleSpeakBilingual}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold transition-all ${
+                isSpeaking
+                  ? 'bg-amber-500 text-white animate-pulse shadow-sm shadow-amber-500/30'
+                  : isActive
+                    ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-800/60'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/30'
+              }`}
+              title={isSpeaking ? 'Dừng đọc' : 'Phát âm câu này (EN ➔ VI)'}
+            >
+              <Volume2 size={12} className={isSpeaking ? 'animate-bounce' : ''} />
+              <span>{isSpeaking ? 'Đang đọc...' : isActive ? 'Đọc song ngữ' : 'Nghe'}</span>
+            </button>
           </div>
 
           <div className='flex items-center gap-1'>
