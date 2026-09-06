@@ -311,10 +311,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [togglePlay, onPrevSentence, onNextSentence, onRepeatSentence])
 
-  const embedUrl =
-    'https://www.youtube.com/embed/' +
-    videoId +
-    '?enablejsapi=1&playsinline=1&rel=0&autoplay=0&iv_load_policy=3&fs=0'
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&playsinline=1&rel=0&autoplay=0&iv_load_policy=3&fs=0`
 
   return (
     <div className='flex flex-col shrink-0 rounded-2xl overflow-hidden bg-black shadow-xl border border-gray-800 transition-all'>
@@ -327,6 +324,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           title='YouTube video player'
           className='w-full h-full border-0 bg-black'
           allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+          referrerPolicy='strict-origin-when-cross-origin'
           allowFullScreen={false}
         />
       </div>

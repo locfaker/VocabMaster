@@ -349,24 +349,6 @@ app.whenReady().then(async () => {
   try {
     session.defaultSession.setUserAgent(CHROME_USER_AGENT)
 
-    // Rewrite Referer, Origin, and User-Agent for YouTube embeds inside Electron file://
-    session.defaultSession.webRequest.onBeforeSendHeaders(
-      {
-        urls: [
-          '*://*.youtube.com/*',
-          '*://*.youtube-nocookie.com/*',
-          '*://*.googlevideo.com/*',
-          '*://*.ytimg.com/*',
-        ],
-      },
-      (details, callback) => {
-        details.requestHeaders['Referer'] = 'https://www.youtube.com/'
-        details.requestHeaders['Origin'] = 'https://www.youtube.com'
-        details.requestHeaders['User-Agent'] = CHROME_USER_AGENT
-        callback({ cancel: false, requestHeaders: details.requestHeaders })
-      },
-    )
-
     // Remove frame blocking headers from YouTube
     session.defaultSession.webRequest.onHeadersReceived(
       { urls: ['*://*.youtube.com/*', '*://*.youtube-nocookie.com/*'] },
